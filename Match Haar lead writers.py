@@ -138,12 +138,45 @@ def merge_org_and_sincere_data(org_data, grouped_sincere_data):
     return merged_data
 
 
+def a_not_in_b(left, right, match_field):
+
+    merged = (left.merge(right, on=match_field, how='left', indicator=True, suffixes=('', '_right'))
+     .query('_merge == "left_only"')
+     .drop('_merge', axis=1))
+
+    merged = merged[left.columns]
+
+    # left.merge(right, on=match_field, how='left', indicator=True)
+
+    return merged
 # TODO link to merging / in one not in other code: https://stackoverflow.com/questions/53645882/pandas-merging-101
+
+def read_all_user_data(sincere_all_users):
+    """ read in a sincere all_user csv"""
+    all_user_data = pd.read_csv(sincere_all_users, na_filter=False, dtype={'name': str, })
+    all_user_data = all_user_data.rename(
+        columns={'email': 'existing_email', 'organization': 'room'})
+
+    all_user_data['match_name'] = all_user_data['name'].apply(format_as_matchname)
+
+    missing_name = all_user_data[all_user_data['match_name'] == ''][['match_name', 'existing_email']]
+    if not missing_name.empty:
+        # TODO write to log file and not console
+        pymsgbox.alert(
+            text=f"Some emails were blank in:\n\n   '{Path(sincere_all_users).name}'\n\nThey will be removed.",
+            title='Check Console', button='OK')
+        print()
+        print(Path(sincere_all_users).name)
+        print(missing_name)
+
+    return all_user_data
 
 
 def main_program(input_data):
     """ loop through list of info for each organizers files and supply matched writer report for each"""
     grouped_sincere_data = read_and_group_sincere_data(SINCERE_REQUESTS)
+
+    all_user_data = read_all_user_data(SINCERE_ALL_USERS)
 
     for org_name, org_xls, org_name_field, org_email_field in input_data:
         org_data = read_org_data(org_xls, org_name_field, org_email_field)
@@ -151,6 +184,10 @@ def main_program(input_data):
         # merged_data will contain only writers from Org's file matched by name with past address request counts or
         # email/room for all matches
         merged_data = merge_org_and_sincere_data(org_data, grouped_sincere_data)
+
+        aaa = a_not_in_b(all_user_data, merged_data, 'match_name')
+
+        merged_data2 = pd.concat([merged_data,aaa])
 
         # merged_data.to_excel(f"{org_name} batch load writer match {datetime.today().strftime('%Y-%m-%d')}.xlsx",
 
