@@ -5,14 +5,16 @@ addresses requested by year so we can tell if they should really be added to haa
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from datetime import datetime
+# from datetime import datetime
 import pymsgbox
 # from bekutils import setup_loguru, autosize_xls_cols, bad_path_create, exit_yes_no, exit_yes, \
 #     text_box, get_file_name, get_dir_name, check_ws_headers
 
-SINCERE_REQUESTS = "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads " \
-                   "7-2025/all-parent-campaigns-requests-2025-08-19.csv"  # requests from 1/1/2020 to 8/19/2025
-SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2025-09-08.csv"
+DISPLAY_BLANK_NAME = True
+
+SINCERE_REQUESTS = "/Users/Denise/Downloads/all-parent-campaigns-requests-2025-09-08.csv"  # requests from 1/1/2020
+# to 9/9/2025
+SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2025-09-10.csv"
 
 INPUT_DATA = [
     ["Bob",
@@ -53,6 +55,7 @@ SINCERE_ALL_USERS = Path(SINCERE_ALL_USERS)
 # get date by concatenating last three items separated by '-'
 SINCERE_ALL_USERS_DATE = '-'.join(SINCERE_ALL_USERS.stem.split('-')[-3:])
 
+
 # noinspection SpellCheckingInspection
 def format_as_matchname(name):
     """ format name in most standard fashion so match can be preformed """
@@ -64,7 +67,6 @@ def format_as_matchname(name):
         matched_name = name.replace(' ', '').lower()
     except:
         matched_name = str(name)
-        a = 1
     return matched_name
 
 
@@ -77,7 +79,7 @@ def read_org_data(org_xls, org_name_field, org_email_field):
     org_data['match_name'] = org_data['name'].apply(format_as_matchname)
 
     missing_name = org_data[org_data['match_name'] == ''][['match_name', 'new_email']]
-    if not missing_name.empty:
+    if not missing_name.empty and DISPLAY_BLANK_NAME:
         # TODO write to log file and not console
         pymsgbox.alert(text=f"Some emails were blank in:\n\n   '{Path(org_xls).name}'\n\nThey will be removed.",
                        title='Check Console', button='OK')
@@ -92,8 +94,8 @@ def read_org_data(org_xls, org_name_field, org_email_field):
 
 # TODO: report on list of rows missing name or email; can't load into sincere
 
-def read_and_group_sincere_data(sincere_requests):
-    """ read sincere requests file, rename name, email and room fields and total address counts by year"""
+def read_sincere_requests(sincere_requests):
+    """ read sincere requests file and rename some columns"""
 
     # TODO filter out or report missing emails and names
     sincere_data = pd.read_csv(sincere_requests, na_filter=False, dtype={'name': str, })
@@ -103,7 +105,7 @@ def read_and_group_sincere_data(sincere_requests):
     sincere_data['match_name'] = sincere_data['name'].apply(format_as_matchname)
 
     missing_name = sincere_data[sincere_data['match_name'] == ''][['match_name', 'existing_email']]
-    if not missing_name.empty:
+    if not missing_name.empty and DISPLAY_BLANK_NAME:
         # TODO write to log file and not console
         pymsgbox.alert(
             text=f"Some emails were blank in:\n\n   '{Path(sincere_requests).name}'\n\nThey will be removed.",
@@ -113,8 +115,15 @@ def read_and_group_sincere_data(sincere_requests):
         print(missing_name)
 
     sincere_data = sincere_data[sincere_data['match_name'] != '']
+
+    return sincere_data
+
+
+def group_sincere_data(sincere_data, by_fields):
+    """ create a row for each writer by year/room/email showing total addresses requested"""
+
     sincere_data['year'] = pd.to_datetime(sincere_data['created_at']).dt.year
-    grouped_sincere_data = sincere_data.groupby(['match_name', 'name', 'existing_email', 'room', 'year']) \
+    grouped_sincere_data = sincere_data.groupby(by_fields, dropna=False) \
         .agg({'addresses_count': ['sum', ]}).reset_index()
 
     grouped_sincere_data.columns = grouped_sincere_data.columns.get_level_values(0)
@@ -132,24 +141,27 @@ def merge_org_and_sincere_data(org_data, grouped_sincere_data):
     merged_data['new_email'] = merged_data['new_email'].str.lower()
     merged_data['existing_email'] = merged_data['existing_email'].str.lower()
 
-    # we know these are an existing pwriter because name and email match.
+    # we know these are an existing writer because name and email match.
     merged_data['email_matches'] = np.where(merged_data['new_email'] == merged_data['existing_email'], 'Yes', 'No')
     merged_data = merged_data.reset_index(drop=True)
     return merged_data
 
 
-def a_not_in_b(left, right, match_field):
+def left_not_in_right(left, right, match_field):
+    """ match two dataframes by a common column and return those in left not appearing in right """
 
+    # TODO link to merging / in one not in other code: https://stackoverflow.com/questions/53645882/pandas-merging-101
     merged = (left.merge(right, on=match_field, how='left', indicator=True, suffixes=('', '_right'))
      .query('_merge == "left_only"')
      .drop('_merge', axis=1))
 
     merged = merged[left.columns]
 
+    # was in article above but doesn't seem to be needed
     # left.merge(right, on=match_field, how='left', indicator=True)
 
     return merged
-# TODO link to merging / in one not in other code: https://stackoverflow.com/questions/53645882/pandas-merging-101
+
 
 def read_all_user_data(sincere_all_users):
     """ read in a sincere all_user csv"""
@@ -160,7 +172,7 @@ def read_all_user_data(sincere_all_users):
     all_user_data['match_name'] = all_user_data['name'].apply(format_as_matchname)
 
     missing_name = all_user_data[all_user_data['match_name'] == ''][['match_name', 'existing_email']]
-    if not missing_name.empty:
+    if not missing_name.empty and DISPLAY_BLANK_NAME:
         # TODO write to log file and not console
         pymsgbox.alert(
             text=f"Some emails were blank in:\n\n   '{Path(sincere_all_users).name}'\n\nThey will be removed.",
@@ -174,29 +186,33 @@ def read_all_user_data(sincere_all_users):
 
 def main_program(input_data):
     """ loop through list of info for each organizers files and supply matched writer report for each"""
-    grouped_sincere_data = read_and_group_sincere_data(SINCERE_REQUESTS)
 
-    all_user_data = read_all_user_data(SINCERE_ALL_USERS)
+    sincere_requests = read_sincere_requests(SINCERE_REQUESTS)
+    sincere_users = read_all_user_data(SINCERE_ALL_USERS)
+
+    # writers who have never requested addresses so do not appear in request file
+    users_not_in_requests = left_not_in_right(sincere_users, sincere_requests, 'match_name')
+
+    # sincere_combined will have at least one record for each writer
+    sincere_combined = pd.concat([sincere_requests, users_not_in_requests], ignore_index=True)
+    sincere_combined = sincere_combined[sincere_requests.columns]
+
+    sincere_combined = sincere_combined.sort_values(['match_name', ])
+
+    # combine all record counts for each writer by year/room/email...
+    grouped_sincere_data = group_sincere_data(sincere_combined, ['match_name', 'name', 'existing_email', 'room', 'year'])
 
     for org_name, org_xls, org_name_field, org_email_field in input_data:
         org_data = read_org_data(org_xls, org_name_field, org_email_field)
 
-        # merged_data will contain only writers from Org's file matched by name with past address request counts or
-        # email/room for all matches
+        # merged_data will contain only writers from organizer's file matched by name with past address request
+        # counts or email/room for all matches
         merged_data = merge_org_and_sincere_data(org_data, grouped_sincere_data)
-
-        aaa = a_not_in_b(all_user_data, merged_data, 'match_name')
-
-        merged_data2 = pd.concat([merged_data,aaa])
-
-        # merged_data.to_excel(f"{org_name} batch load writer match {datetime.today().strftime('%Y-%m-%d')}.xlsx",
 
         merged_data.to_excel(Path("rpts") / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} "
                                             f"user data.xlsx",
                              index=True, columns=['name_org', 'email_matches',
                                                   'new_email', 'existing_email', 'room', 'year', 'addresses_count'])
-
-        a = 1
 
 
 if __name__ == '__main__':
