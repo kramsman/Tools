@@ -10,7 +10,8 @@ import pymsgbox
 # from bekutils import setup_loguru, autosize_xls_cols, bad_path_create, exit_yes_no, exit_yes, \
 #     text_box, get_file_name, get_dir_name, check_ws_headers
 
-DISPLAY_BLANK_NAME = True
+DISPLAY_BLANK_NAME = False
+RPT_PATH = Path('rpts')
 
 SINCERE_REQUESTS = "/Users/Denise/Downloads/all-parent-campaigns-requests-2025-09-08.csv"  # requests from 1/1/2020
 # to 9/9/2025
@@ -74,22 +75,27 @@ def read_org_data(org_xls, org_name_field, org_email_field):
     """ read bulk input file supplied by organizer and rename given name and email fields to standard."""
 
     org_data = pd.read_excel(org_xls, dtype=str)
+
+    # trim all values so matches are accurate
+    org_data_obj = org_data.select_dtypes('object')
+    org_data[org_data_obj.columns] = org_data_obj.apply(lambda x: x.str.strip())
+
     org_data = org_data.rename(columns={org_name_field: 'name', org_email_field: 'new_email'})
 
     org_data['match_name'] = org_data['name'].apply(format_as_matchname)
 
-    missing_name = org_data[org_data['match_name'] == ''][['match_name', 'new_email']]
-    if not missing_name.empty and DISPLAY_BLANK_NAME:
+    missing_names = org_data[org_data['match_name'] == '']
+    if not missing_names.empty and DISPLAY_BLANK_NAME:
         # TODO write to log file and not console
         pymsgbox.alert(text=f"Some emails were blank in:\n\n   '{Path(org_xls).name}'\n\nThey will be removed.",
                        title='Check Console', button='OK')
         print()
         print(Path(org_xls).name)
-        print(missing_name)
+        print(missing_names)
 
     org_data = org_data[org_data['match_name'] != '']
 
-    return org_data
+    return org_data, missing_names
 
 
 # TODO: report on list of rows missing name or email; can't load into sincere
@@ -184,6 +190,34 @@ def read_all_user_data(sincere_all_users):
     return all_user_data
 
 
+def write_report_sheet(rpt_path, org_name, change_emails, duplicate_matchnames, merged_data, missing_names):
+
+    writer = pd.ExcelWriter(
+        rpt_path / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx")
+
+    change_emails.to_excel(
+        writer,
+        sheet_name='change emails',
+        index=True, columns=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'])
+
+    duplicate_matchnames.to_excel(
+        writer,
+        sheet_name='dupes only',
+        index=True, columns=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'])
+
+    merged_data.to_excel(
+        writer,
+        sheet_name='all writers',
+        index=True, columns=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'])
+
+    missing_names.to_excel(
+        writer,
+        sheet_name='missing_names',
+        index=True, columns=['new_email', ])
+
+    writer.close()
+
+
 def main_program(input_data):
     """ loop through list of info for each organizers files and supply matched writer report for each"""
 
@@ -203,16 +237,23 @@ def main_program(input_data):
     grouped_sincere_data = group_sincere_data(sincere_combined, ['match_name', 'name', 'existing_email', 'room', 'year'])
 
     for org_name, org_xls, org_name_field, org_email_field in input_data:
-        org_data = read_org_data(org_xls, org_name_field, org_email_field)
+        org_data, missing_names = read_org_data(org_xls, org_name_field, org_email_field)
 
         # merged_data will contain only writers from organizer's file matched by name with past address request
         # counts or email/room for all matches
         merged_data = merge_org_and_sincere_data(org_data, grouped_sincere_data)
 
-        merged_data.to_excel(Path("rpts") / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} "
-                                            f"user data.xlsx",
-                             index=True, columns=['name_org', 'email_matches',
-                                                  'new_email', 'existing_email', 'room', 'year', 'addresses_count'])
+        duplicate_matchnames = merged_data[merged_data.match_name.duplicated(keep=False)]
+
+        not_duplicate_matchnames = merged_data.drop_duplicates(subset='match_name', keep=False)
+
+        # emails that should be changed: only show in org's room, name matches, email does not
+        change_emails = not_duplicate_matchnames.loc[
+            (not_duplicate_matchnames['room'].str.contains('Team ' + org_name, case=False, na=False)) &
+            (not_duplicate_matchnames['email_matches'] == 'No')
+             ]
+
+        write_report_sheet(RPT_PATH, org_name, change_emails, duplicate_matchnames, merged_data, missing_names)
 
 
 if __name__ == '__main__':
