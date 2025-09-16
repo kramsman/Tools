@@ -24,7 +24,7 @@ def df_issubset(item, list_from_df_element):
 
     return is_subset
 
-def incol(df, occurance_col, group_column=None ):
+def is_found(df, occurance_col, group_column=None):  # TODO add filter field, found in list or not
     """ returns records with col_name value found in other records
     """
 
@@ -32,31 +32,52 @@ def incol(df, occurance_col, group_column=None ):
     #     simple_list = [x for x in list_from_df_element]
     #     return simple_list
 
+    # TODO explore isin instead of issubset
+
     if group_column is None:  # need to set up simple case with list normally created via groupby
-        df['_occurance_col_list'] = df[occurance_col]
-    else:
-        # Group by 'key_column' and aggregate 'value_column' into a list
-        df_agg_as_list = df.groupby('group_column')['occurance_col'].agg(list).reset_index()
+        # df['_occurance_col_list'] = df[occurance_col]
+        group_column = occurance_col
 
-        # Rename the aggregated column for clarity (optional)
-        df_agg_as_list.rename(columns={'occurance_col': '_occurance_col_list'}, inplace=True)
+    # Group by 'key_column' and aggregate 'value_column' into a list
+    df_groupby = df.groupby(group_column) \
+        .agg(_col_list=(occurance_col, list),
+             _row_count=(occurance_col, 'count')
+             ).reset_index() \
+        .query("_row_count > 1 ")
 
-        print("\naggregated dataFrame with lists:")
-        print(df_agg_as_list)
+    # df_agg_as_list = df.groupby('group_column')['occurance_col'].\
+    #     agg([list, 'count'] ).reset_index().\
+    #     query("count > 1 ")
 
-        # you can use pd.merge() or df.merge()
-        df_merged = df.merge(df_agg_as_list, on='group_column', how='left')
+    # Rename the aggregated column for clarity (optional)
+    # df_groupby.rename(columns={'occurance_col': '_occurance_col_list'}, inplace=True)
 
-        df_merged['is_subset'] = set('occurance_col').issubset('_occurance_col_list')
+    print("\nGroupby aggregated dataFrame with lists and single occurrences removed:")
+    print(df_groupby)
 
-        print("\nOriginal DataFrame with aggregated lists merged:")
-        print(df_merged)
+    # you can use pd.merge() or df.merge()
+    df_merged = df.merge(df_groupby, on=group_column, how='left')
+
+    # df_merged['is_subset'] = set(occurance_col).issubset('_col_list')
+
+    df_merged['is_found_in_another'] = df_merged. \
+        apply(lambda row: df_issubset(row[occurance_col], row['_col_list']), axis=1)
+
+    print("\nMerged dataFrame with aggregated lists merged with repeats still in:")
+    print(df_merged)
+
+    df_merged = df_merged.loc[df_merged['is_found_in_another'] == True]
+    print("\nMerged dataFrame with aggregated lists merged and non-repeat removed:")
+    print(df_merged)
+
+    # clean up temporary field
+    df_merged = df_merged.drop(['is_found_in_another', '_col_list', '_row_count'], axis=1)
+
+    return df_merged
 
 
-    df['inlist'] = df.\
-        apply(lambda row: df_issubset(row[occurance_col], row['_occurance_col_list']), axis=1)
 
-    a=1
+    # a=1
 
     # df['list_by_comprehension'] = [element for element in df['list_column']]
     # df['inlist'] = set(df['list_column'])  # FAILED: TypeError: unhashable type: 'list'
@@ -69,8 +90,8 @@ def incol(df, occurance_col, group_column=None ):
     # df['list_by_lambda_and_myfunc2'] = df[['other_column','list_column']].\
     #     apply(lambda row: df_issubset(row['other_column'], row['list_column']))
 
-    print("DataFrame: df")
-    print(df)
+    # print("DataFrame: df")
+    # print(df)
 
     # x_list = df_merged[df_merged['X'].isin(df_merged['other_list'])]
     # df_merged['inlist'] = df_merged['other_column'].isin(df_merged['other_list'])
@@ -81,7 +102,7 @@ def incol(df, occurance_col, group_column=None ):
     # x_list2 = df_merged.loc[
     #     (df_merged['key_column'].str.contains('element', case=False, na=False))]
 
-    return df
+    # return df
 
 
 def main_program():
@@ -108,17 +129,30 @@ def main_program():
     print("DataFrame: df")
     print(df)
 
-    df_agg_as_list = df.groupby('writer')['room'].agg([list, 'count'] ).reset_index().\
-        query("count > 1 ")
-    df_merged = df.merge(df_agg_as_list, on='writer', how='left')
-    # df_merged['list'] = df['list'].fillna('nan')
+    # df_agg_as_list = df.groupby('writer')['room'].agg([list, 'count'] ).reset_index().\
+    #     query("count > 1 ")
 
-    df_merged['inlist'] = df_merged.\
-        apply(lambda row: df_issubset(row['room'], row['list']), axis=1)
+    # with rename
+    # df_agg_as_list = df.groupby('writer')\
+    #     .agg(_col_list=('room', list),
+    #     _row_count=('room', 'count')
+    #          ).reset_index()\
+    #     .query("_row_count > 1 ")
+    #
+    # df_merged = df.merge(df_agg_as_list, on='writer', how='left')
+    # # df_merged['list'] = df['list'].fillna('nan')
+    #
+    # df_merged['inlist'] = df_merged.\
+    #     apply(lambda row: df_issubset(row['room'], row['_col_list']), axis=1)
 
 
-    # df['common'] = incol(df, 'writer', 'room',)
-    df['common'] = incol(df, 'writer',)
+    # df['common'] = is_found(df, 'writer', 'room',)
+    # sets column 'is_found_' if record's room is found in another record
+    is_found_in_another = is_found(df, 'room', )
+    # is_found_in_another = is_found(df, 'room', 'writer', )
+
+    print("\nDataFrame: is_found_in_another")
+    print(is_found_in_another)
 
     # df['inlist'] = df["other_column"].isin(["element", "y"])
     # df['inlist'] = pd.DataFrame(df['list_column'].apply(lambda element: element))
@@ -128,7 +162,7 @@ def main_program():
     # df['inlist'] = [set(element).issubset(df["other_column"].tolist()) for element in df['list_column']]
     # df['inlist'] = df["other_column"].issubset(set([element for element in df['list_column']]))
 
-
+    a=1
 
 if __name__ == '__main__':
     main_program()
