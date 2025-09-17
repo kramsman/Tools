@@ -4,7 +4,6 @@ addresses requested by year so we can tell if they should really be added to haa
 
 from multi_vals import is_found_in_another
 
-import xlsxwriter 
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -21,15 +20,15 @@ SINCERE_REQUESTS = "/Users/Denise/Downloads/all-parent-campaigns-requests-2025-0
 SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2025-09-10.csv"
 
 INPUT_DATA = [
-["Larry",
+    ["Larry",
      "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Larry writers for ROV ver 1.xlsx",
      "Name", "email",
      ],
-["Jim",
+    ["Jim",
      "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Jim Sincere "
      "Upload 20250817.xlsx",
      "Name", "E-mail",
-     ],
+    ],
 ]
 
 # INPUT_DATA = [
@@ -204,64 +203,97 @@ def read_all_user_data(sincere_all_users):
     return all_user_data
 
 
-def write_report_sheet(rpt_path, org_name, change_emails, duplicate_matchnames, merged_data, missing_names, all_haar):
+def write_report(rpt_path, org_name, change_emails, duplicate_matchnames, merged_data, missing_names, all_haar):
+    """ write all sheets into workbook for report dfs """
 
+    # import xlsxwriter
     writer = pd.ExcelWriter(
         rpt_path / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx", engine='xlsxwriter')
 
-    all_haar.to_excel(
-        writer,
-        index=False,
-        sheet_name='all haar',
-        startcol=1,
-        columns=['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year',
-                 'addresses_count',
-                 'new_email',])
+    def write_banded(df, field_list, sheetname, title1):
+        """ print sheet in specific format """
 
-    # Get the xlsxwriter workbook and worksheet objects
-    workbook = writer.book
-    worksheet = writer.sheets['all haar']
+        def index_to_col(column_int):
+            """ converts an excel column number to corresponding letter """
+            start_index = 1  # it can start either at 0 or at 1
+            letter = ''
+            while column_int > 25 + start_index:
+                letter += chr(65 + int((column_int - start_index) / 26) - 1)
+                column_int = column_int - (int((column_int - start_index) / 26)) * 26
+            letter += chr(65 - start_index + (int(column_int)))
+            return letter
 
-    worksheet.write(0, 0, 'band')  # column label, row_num, col_num (0-indexed)
-    worksheet.write(1, 0, 0)  # seed of band column
-    # worksheet.write_formula(2, 0, '=IF(C3<>C2,1-A2,A2)')  #
+        header_row = 2  # zero indexed
+        df.to_excel(
+            writer,
+            index=False,
+            sheet_name=sheetname,
+            startrow=header_row,
+            startcol=1,
+            columns=field_list)
 
-    # Write formulas to the 'ColC' column
-    # Assuming data starts from row 2 (after header)
-    for row_num in range(2, len(all_haar) + 1):  # Loop through rows, adjusting for 0-based index and header
-        formula = f'=IF(B{row_num+1}<>B{row_num},1-A{row_num},A{row_num})'  # alternate 0/1 when column C changes,
-        # '=IF(C3<>C2,1-A2,A2)'
-        worksheet.write_formula(row_num, 0, formula)
+        # Get the xlsxwriter workbook and worksheet objects
+        workbook = writer.book
+        worksheet = writer.sheets[sheetname]
+        worksheet.set_landscape()
+        worksheet.set_margins(left=.25, right=.25, top=.25, bottom=.25)
+        worksheet.fit_to_pages(1, 99)
+        worksheet.print_black_and_white()
 
-    red_format = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})  # black on light red
-    worksheet.conditional_format(f'$A$2:$J${len(all_haar)+1}', {
-        'type': 'formula',
-        'criteria': '=$A2=1',
-        'format': red_format
-    })
-    worksheet.autofit()
+        worksheet.write(header_row, 0, 'band')  # column label, row_num, col_num (0-indexed)
+        worksheet.write(header_row+1, 0, 0)  # seed of band column
+        # worksheet.write_formula(2, 0, '=IF(C3<>C2,1-A2,A2)')  #
 
-    print("Excel file 'output_with_formulas.xlsx' created with formulas.")
+        # Write formulas down column assuming data starts from row after header
+        for row_num in range(header_row+2, len(df) + 3):  # Loop through rows, adjusting for 0-based index and
+            # header
+            formula = f'=IF(B{row_num+1}<>B{row_num},1-A{row_num},A{row_num})'  # alternate 0/1 when column C changes,
+            # '=IF(C3<>C2,1-A2,A2)'
+            worksheet.write_formula(row_num, 0, formula)
 
-    change_emails.to_excel(
-        writer,
-        sheet_name='change emails',
-        index=True, columns=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'])
+        col = index_to_col(len(field_list)+1)
+        red_format = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})  # black on light red
+        worksheet.conditional_format(f'$A${header_row+1}:${col}${len(df)+ header_row+1}', {
+            'type': 'formula',
+            'criteria': f'=$A{header_row+1}=1',
+            'format': red_format
+        })
+        worksheet.autofit()
+        worksheet.write(0, 0, title1)  #
+        # title of bookname, row_num, col_num (0-indexed)
 
-    duplicate_matchnames.to_excel(
-        writer,
-        sheet_name='dupes only',
-        index=True, columns=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'])
+        print("Excel file 'output_with_formulas.xlsx' created with formulas.")
 
-    merged_data.to_excel(
-        writer,
-        sheet_name='all writers',
-        index=True, columns=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'])
+    write_banded(all_haar,
+                 ['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year',
+                     'addresses_count', 'new_email', ],
+                 'multi',
+                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
+                 )
 
-    missing_names.to_excel(
-        writer,
-        sheet_name='missing_names',
-        index=True, columns=['new_email', ])
+    write_banded(change_emails,
+                 ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
+                 'change emails',
+                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
+                 )
+
+    write_banded(duplicate_matchnames,
+                 ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
+                 'dupes',
+                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
+                 )
+
+    write_banded(merged_data,
+                 ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
+                 'all writers',
+                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
+                 )
+
+    write_banded(missing_names,
+                 ['new_email', ],
+                 'missing_names',
+                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
+                 )
 
     writer.close()
 
@@ -292,7 +324,7 @@ def main(input_data):
         # counts or email/room for all matches
         merged_data = merge_org_and_sincere_data(org_data, grouped_sincere_data)
 
-        all_haar = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string='Haar')
+        all_haar = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}')
 
         duplicate_matchnames = merged_data[merged_data.match_name.duplicated(keep=False)]
         haar_dupes = duplicate_matchnames.loc[
@@ -308,8 +340,8 @@ def main(input_data):
             (not_duplicate_matchnames['email_matches'] == 'No')
              ]
 
-        write_report_sheet(RPT_PATH, org_name, change_emails, duplicate_matchnames, merged_data, missing_names,
-                           all_haar)
+        write_report(RPT_PATH, org_name, change_emails, duplicate_matchnames, merged_data, missing_names,
+                     all_haar)
 
 
 if __name__ == '__main__':
