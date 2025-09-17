@@ -4,6 +4,7 @@ addresses requested by year so we can tell if they should really be added to haa
 
 from multi_vals import is_found_in_another
 
+import xlsxwriter 
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -206,7 +207,7 @@ def read_all_user_data(sincere_all_users):
 def write_report_sheet(rpt_path, org_name, change_emails, duplicate_matchnames, merged_data, missing_names, all_haar):
 
     writer = pd.ExcelWriter(
-        rpt_path / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx")
+        rpt_path / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx", engine='xlsxwriter')
 
     all_haar.to_excel(
         writer,
@@ -216,6 +217,31 @@ def write_report_sheet(rpt_path, org_name, change_emails, duplicate_matchnames, 
         columns=['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year',
                  'addresses_count',
                  'new_email',])
+
+    # Get the xlsxwriter workbook and worksheet objects
+    workbook = writer.book
+    worksheet = writer.sheets['all haar']
+
+    worksheet.write(0, 0, 'band')  # column label, row_num, col_num (0-indexed)
+    worksheet.write(1, 0, 0)  # seed of band column
+    # worksheet.write_formula(2, 0, '=IF(C3<>C2,1-A2,A2)')  #
+
+    # Write formulas to the 'ColC' column
+    # Assuming data starts from row 2 (after header)
+    for row_num in range(2, len(all_haar) + 1):  # Loop through rows, adjusting for 0-based index and header
+        formula = f'=IF(B{row_num+1}<>B{row_num},1-A{row_num},A{row_num})'  # alternate 0/1 when column C changes,
+        # '=IF(C3<>C2,1-A2,A2)'
+        worksheet.write_formula(row_num, 0, formula)
+
+    red_format = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})  # black on light red
+    worksheet.conditional_format(f'$A$2:$J${len(all_haar)+1}', {
+        'type': 'formula',
+        'criteria': '=$A2=1',
+        'format': red_format
+    })
+    worksheet.autofit()
+
+    print("Excel file 'output_with_formulas.xlsx' created with formulas.")
 
     change_emails.to_excel(
         writer,
