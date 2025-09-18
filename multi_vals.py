@@ -7,24 +7,25 @@ def df_issubset(item, list_from_df_element):
     """ issubset function when list is an element of a dataframe
     (I think doesn't work because list is returned as series"""
 
-    normal_list = list_from_df_element
+    # normal_list = list_from_df_element
     if not isinstance(item, list):
-        item_list = [item]
+        item_as_list = [item]
     else:
-        item_list = item
+        item_as_list = item
 
-    if not isinstance(normal_list, list):
+    if not isinstance(list_from_df_element, list):
+    # if not isinstance(normal_list, list):
         is_subset = False
     else:
-        is_subset = set(item_list).issubset(normal_list)
+        is_subset = set(item_as_list).issubset(list_from_df_element)
+        # is_subset = set(item_as_list).issubset(normal_list)
 
     return is_subset
 
 
-def is_found_in_another(df, occurance_col, group_column=None, filter_string=None):
-    """ returns records with col_name value found in other records """
-
-    # TODO: explore isin instead of issubset
+def is_found_in_another(df, occurance_col, group_column=None, filter_string=None, solo_occ=False):
+    """ returns records with col_name value found in other records
+    """
 
     if group_column is None:  # need to set up simple case with list normally created via groupby
         group_column = occurance_col
@@ -44,6 +45,8 @@ def is_found_in_another(df, occurance_col, group_column=None, filter_string=None
     df_merged = df.merge(df_groupby, on=group_column, how='left')
 
     df_merged = df_merged[df_merged['_col_list_joined'].str.contains(filter_string.lower(), na=False)]
+
+    # df_merged['is_subset'] = set(df_merged['room']).issubset(set(df_merged['_col_list']))  # does not work:TypeError: unhashable type: 'list'
 
     df_merged['is_found_in_another'] = df_merged. \
         apply(lambda row: df_issubset(row[occurance_col], row['_col_list']), axis=1)
