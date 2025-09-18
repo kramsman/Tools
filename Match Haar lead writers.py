@@ -19,49 +19,50 @@ SINCERE_REQUESTS = "/Users/Denise/Downloads/all-parent-campaigns-requests-2025-0
 # to 9/9/2025
 SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2025-09-10.csv"
 
-INPUT_DATA = [
-    ["Larry",
-     "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Larry writers for ROV ver 1.xlsx",
-     "Name", "email",
-     ],
-    ["Jim",
-     "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Jim Sincere "
-     "Upload 20250817.xlsx",
-     "Name", "E-mail",
-    ],
-]
-
-# INPUT_DATA = [
-#     ["Bob",
-#      "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Bob Haar current writers and match to Sincere 7-26-2025.xlsx",
-#      "Name", "Email",
-#      ],
-#     ["Judy",
-#      "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Judy writers 6.9.25.xlsx",
-#      "Name", "Email",
-#      ],
-#     ["Gary",
-#      "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Gary writers 7-27-2025.xlsx",
-#      "Name", "Email",
-#      ],
-#     ["Mary Jane",
-#      "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar PoliticalMaryJaneWriters 7-28-2025.xlsx",
-#      "Name", "Email Address",
-#      ],
-#     ["Larry",
-#      "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Larry writers for ROV ver 1.xlsx",
-#      "Name", "email",
-#      ],
-#     ["Marlene",
-#      "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Marlene writers ROV ListForBrianKramer 7-29-20251.xlsx",
-#      "NAME", "EMAIL",
-#      ],
-#     ["Jim",
-#      "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Jim Sincere "
-#      "Upload 20250817.xlsx",
-#      "Name", "E-mail",
-#      ]
-# ]
+if True:
+    INPUT_DATA = [
+        ["Larry",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Larry writers for ROV ver 1.xlsx",
+         "Name", "email",
+         ],
+        ["Jim",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Jim Sincere "
+         "Upload 20250817.xlsx",
+         "Name", "E-mail",
+        ],
+    ]
+else:
+    INPUT_DATA = [
+        ["Bob",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Bob Haar current writers and match to Sincere 7-26-2025.xlsx",
+         "Name", "Email",
+         ],
+        ["Judy",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Judy writers 6.9.25.xlsx",
+         "Name", "Email",
+         ],
+        ["Gary",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Gary writers 7-27-2025.xlsx",
+         "Name", "Email",
+         ],
+        ["Mary Jane",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar PoliticalMaryJaneWriters 7-28-2025.xlsx",
+         "Name", "Email Address",
+         ],
+        ["Larry",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Larry writers for ROV ver 1.xlsx",
+         "Name", "email",
+         ],
+        ["Marlene",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Marlene writers ROV ListForBrianKramer 7-29-20251.xlsx",
+         "NAME", "EMAIL",
+         ],
+        ["Jim",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Jim Sincere "
+         "Upload 20250817.xlsx",
+         "Name", "E-mail",
+         ]
+    ]
 
 ## below begins programming code
 SINCERE_REQUESTS = Path(SINCERE_REQUESTS)
@@ -100,7 +101,6 @@ def read_org_data(org_xls, org_name_field, org_email_field):
 
     missing_names = org_data[org_data['match_name'] == '']
     if not missing_names.empty and DISPLAY_BLANK_NAME:
-        # TODO write to log file and not console
         pymsgbox.alert(text=f"Some emails were blank in:\n\n   '{Path(org_xls).name}'\n\nThey will be removed.",
                        title='Check Console', button='OK')
         print()
@@ -112,12 +112,9 @@ def read_org_data(org_xls, org_name_field, org_email_field):
     return org_data, missing_names
 
 
-# TODO: report on list of rows missing name or email; can't load into sincere
-
 def read_sincere_requests(sincere_requests):
     """ read sincere requests file and rename some columns"""
 
-    # TODO filter out or report missing emails and names
     sincere_data = pd.read_csv(sincere_requests, na_filter=False, dtype={'name': str, })
     sincere_data = sincere_data.rename(
         columns={'writer_name': 'name', 'writer_email': 'existing_email', 'org_name': 'room'})
@@ -126,7 +123,6 @@ def read_sincere_requests(sincere_requests):
 
     missing_name = sincere_data[sincere_data['match_name'] == ''][['match_name', 'existing_email']]
     if not missing_name.empty and DISPLAY_BLANK_NAME:
-        # TODO write to log file and not console
         pymsgbox.alert(
             text=f"Some emails were blank in:\n\n   '{Path(sincere_requests).name}'\n\nThey will be removed.",
             title='Check Console', button='OK')
@@ -182,7 +178,6 @@ def left_not_in_right(left, right, match_field):
 
 def read_all_user_data(sincere_all_users):
     """ read in a sincere all_user csv"""
-    # TODO: read and print active field
 
     all_user_data = pd.read_csv(sincere_all_users, na_filter=False, dtype={'name': str, })
     all_user_data = all_user_data.rename(
@@ -192,7 +187,6 @@ def read_all_user_data(sincere_all_users):
 
     missing_name = all_user_data[all_user_data['match_name'] == ''][['match_name', 'existing_email']]
     if not missing_name.empty and DISPLAY_BLANK_NAME:
-        # TODO write to log file and not console
         pymsgbox.alert(
             text=f"Some emails were blank in:\n\n   '{Path(sincere_all_users).name}'\n\nThey will be removed.",
             title='Check Console', button='OK')
@@ -203,10 +197,10 @@ def read_all_user_data(sincere_all_users):
     return all_user_data
 
 
-def write_report(rpt_path, org_name, change_emails, duplicate_matchnames, merged_data, missing_names, all_haar):
+def write_report(rpt_path, org_name, org_file, change_emails, duplicate_matchnames, merged_data, missing_names,
+                 all_haar):
     """ write all sheets into workbook for report dfs """
 
-    # import xlsxwriter
     writer = pd.ExcelWriter(
         rpt_path / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx", engine='xlsxwriter')
 
@@ -262,38 +256,31 @@ def write_report(rpt_path, org_name, change_emails, duplicate_matchnames, merged
         worksheet.write(0, 0, title1)  #
         # title of bookname, row_num, col_num (0-indexed)
 
-        print("Excel file 'output_with_formulas.xlsx' created with formulas.")
-
     write_banded(all_haar,
                  ['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year',
                      'addresses_count', 'new_email', ],
                  'multi',
-                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
-                 )
+                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     write_banded(change_emails,
                  ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
                  'change emails',
-                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
-                 )
+                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     write_banded(duplicate_matchnames,
                  ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
                  'dupes',
-                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
-                 )
+                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     write_banded(merged_data,
                  ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
                  'all writers',
-                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
-                 )
+                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     write_banded(missing_names,
                  ['new_email', ],
                  'missing_names',
-                 f"'{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx'"
-                 )
+                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     writer.close()
 
@@ -319,18 +306,20 @@ def main(input_data):
 
     for org_name, org_xls, org_name_field, org_email_field in input_data:
         org_data, missing_names = read_org_data(org_xls, org_name_field, org_email_field)
+        org_file = Path(org_xls).name
 
         # merged_data will contain only writers from organizer's file matched by name with past address request
         # counts or email/room for all matches
         merged_data = merge_org_and_sincere_data(org_data, grouped_sincere_data)
 
-        all_haar = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}')
+        # only groups of records where f'Team {org_name}' is in one of the rooms
+        org_data = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}')
 
         duplicate_matchnames = merged_data[merged_data.match_name.duplicated(keep=False)]
-        haar_dupes = duplicate_matchnames.loc[
-            (duplicate_matchnames['room'].str.contains('Haar', case=False, na=False)) &
-            (duplicate_matchnames['email_matches'] == 'No')
-             ]
+        # haar_dupes = duplicate_matchnames.loc[
+        #     (duplicate_matchnames['room'].str.contains('Haar', case=False, na=False)) &
+        #     (duplicate_matchnames['email_matches'] == 'No')
+        #      ]
 
         not_duplicate_matchnames = merged_data.drop_duplicates(subset='match_name', keep=False)
 
@@ -340,8 +329,8 @@ def main(input_data):
             (not_duplicate_matchnames['email_matches'] == 'No')
              ]
 
-        write_report(RPT_PATH, org_name, change_emails, duplicate_matchnames, merged_data, missing_names,
-                     all_haar)
+        write_report(RPT_PATH, org_name, org_file, change_emails, duplicate_matchnames, merged_data, missing_names,
+                     org_data)
 
 
 if __name__ == '__main__':

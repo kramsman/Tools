@@ -21,11 +21,10 @@ def df_issubset(item, list_from_df_element):
     return is_subset
 
 
-def is_found(df, occurance_col, group_column=None):  # TODO add filter field, found in list or not
-    """ returns records with col_name value found in other records
-    """
+def is_found_in_another(df, occurance_col, group_column=None, filter_string=None):
+    """ returns records with col_name value found in other records """
 
-    # TODO explore isin instead of issubset
+    # TODO: explore isin instead of issubset
 
     if group_column is None:  # need to set up simple case with list normally created via groupby
         group_column = occurance_col
@@ -34,13 +33,17 @@ def is_found(df, occurance_col, group_column=None):  # TODO add filter field, fo
     df_groupby = df.groupby(group_column) \
         .agg(_col_list=(occurance_col, list),
              _row_count=(occurance_col, 'count')
-             ).reset_index() \
-        .query("_row_count > 1 ")
+             )\
+        .reset_index().query("_row_count > 1 ")
+
+    df_groupby['_col_list_joined'] = df_groupby['_col_list'].apply(lambda x: '#'.join(x).lower())
 
     print("\nGroupby aggregated dataFrame with lists and single occurrences removed:")
     print(df_groupby)
 
     df_merged = df.merge(df_groupby, on=group_column, how='left')
+
+    df_merged = df_merged[df_merged['_col_list_joined'].str.contains(filter_string.lower(), na=False)]
 
     df_merged['is_found_in_another'] = df_merged. \
         apply(lambda row: df_issubset(row[occurance_col], row['_col_list']), axis=1)
@@ -58,34 +61,25 @@ def is_found(df, occurance_col, group_column=None):  # TODO add filter field, fo
     return df_merged
 
 
-def main_program():
-    """ test out is_found function"""
+def main():
+    """ test out is_found_in_another function"""
 
-    # data = {
-    #         'value_column': [10, 20, 30, 40,],
-    #         'key_column': ['A', 'B', 'A', 'C',],
-    #         'other_column': [['x'], ['x'], ['z'], ['w'],],
-    #         'list_column': [('x','y'), ('x'), ('z'), ('w'),],
-    #         }
+    is_found = is_found_in_another(df, 'room', 'writer', 'HaaR')
 
+    print("\nDataFrame: is_found_in_another")
+    print(is_found)
+
+
+if __name__ == '__main__':
     data = {
             'writer': ['jim', 'jim', 'kate', ],
-            'room': ['NY', 'CA', 'NY', ],
+            'room': ['NY', 'Haar', 'NY', ],
             'value_column': [10, 20, 30, ],
             }
 
     df = pd.DataFrame(data)
+    del data
     print("DataFrame: df")
     print(df)
 
-    is_found_in_another = is_found(df, 'room', )
-    # is_found_in_another = is_found(df, 'room', 'writer', )
-
-    print("\nDataFrame: is_found_in_another")
-    print(is_found_in_another)
-
-    a = 1
-
-
-if __name__ == '__main__':
-    main_program()
+    main()
