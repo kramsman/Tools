@@ -196,6 +196,8 @@ def write_report(rpt_path, org_name, org_filename, change_emails, duplicate_matc
                  all_haar):
     """ write all sheets into workbook for report dfs """
 
+    # FIXME: make file names named parameters
+
     writer = pd.ExcelWriter(
         rpt_path / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx", engine='xlsxwriter')
 
@@ -318,7 +320,8 @@ def main(input_data):
 
         print(f"org name - ready to is_found_in_another: {org_name}")
         # df with only groups of records where 'Team {org_name}' is in at least one room
-        org_data = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}')
+        org_data = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team '
+                                                                                                     f'{org_name}', solo=False)
 
         duplicate_matchnames = merged_data[merged_data.match_name.duplicated(keep=False)]
         # haar_dupes = duplicate_matchnames.loc[
@@ -333,7 +336,7 @@ def main(input_data):
         #     (not_duplicate_matchnames['room'].str.contains('Team ' + org_name, case=False, na=False)) &
         #     (not_duplicate_matchnames['email_matches'] == 'No')
         #      ]
-        change_emails = is_found_in_another(merged_data, 'room', group_column='room', filter_string=f'Team {org_name}',
+        change_emails = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}',
                                             solo=True)
 
         write_report(RPT_PATH, org_name, org_file, change_emails, duplicate_matchnames, merged_data, missing_names,

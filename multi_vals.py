@@ -27,6 +27,8 @@ def is_found_in_another(df, occurance_col, group_column=None, filter_string=None
     """ returns records with col_name value found in other records
     """
 
+    # FIXME: add ability to keep single rows - maybe desired for solo?
+
     if group_column is None:  # this is no group. need to set up simple case with list normally created via groupby
         group_column = occurance_col
 
