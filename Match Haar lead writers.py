@@ -308,20 +308,21 @@ def main(input_data):
 
     for org_name, org_xls, org_name_field, org_email_field in input_data:  # input_data is list of org's file and info
 
-        # read org's bulk input file supplying their fields used for name and email (different between orgs)
-        org_data, missing_names = read_org_data(org_xls, org_name_field, org_email_field)
-
         # get the org filename from the whole path to use as identifier in reports
         org_file = Path(org_xls).name
 
-        # matching and lookup must be attempted by name because writer can have different emails within or across rooms
+        # read org's bulk input file supplying their fields used for name and email (different between orgs)
+        # create an error file of missing writer names (Sincere will ignore and not load)
+        org_data, missing_names = read_org_data(org_xls, org_name_field, org_email_field)
+
+        # matching and lookup must be done by name because writer can have different emails within or across rooms
         # merged_data will contain only writers from org's file matched by name with past request counts or email/room
         merged_data = merge_org_and_sincere_data(org_data, grouped_sincere_data)
 
         print(f"org name - ready to is_found_in_another: {org_name}")
         # df with only groups of records where 'Team {org_name}' is in at least one room
-        org_data = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team '
-                                                                                                     f'{org_name}', solo=False)
+        org_data = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}',
+                                       homogenous_group=False)
 
         duplicate_matchnames = merged_data[merged_data.match_name.duplicated(keep=False)]
         # haar_dupes = duplicate_matchnames.loc[
@@ -331,13 +332,9 @@ def main(input_data):
 
         not_duplicate_matchnames = merged_data.drop_duplicates(subset='match_name', keep=False)
 
-        # emails that should be changed: only show in org's room with name matche but email does not
-        # change_emails = not_duplicate_matchnames.loc[
-        #     (not_duplicate_matchnames['room'].str.contains('Team ' + org_name, case=False, na=False)) &
-        #     (not_duplicate_matchnames['email_matches'] == 'No')
-        #      ]
-        change_emails = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}',
-                                            solo=True)
+        # emails that should be changed: only show in org's room with name matching but not email
+        change_emails = is_found_in_another(merged_data, 'room', group_column='match_name',
+                                            filter_string=f'Team {org_name}', single_row=True, homogenous_group=True)
 
         write_report(RPT_PATH, org_name, org_file, change_emails, duplicate_matchnames, merged_data, missing_names,
                      org_data)

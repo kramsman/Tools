@@ -25,6 +25,8 @@ def df_issubset(item, list_from_df_element):
 
 def is_found_in_another(df, occurance_col, group_column=None, filter_string=None, solo_occ=False):
     """ returns records with col_name value found in other records
+    :param single_row:
+    :type single_row:
     """
 
     # FIXME: add ability to keep single rows - maybe desired for solo?
