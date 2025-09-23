@@ -25,11 +25,6 @@ if True:
          "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Larry writers for ROV ver 1.xlsx",
          "Name", "email",
          ],
-        ["Jim",
-         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Jim Sincere "
-         "Upload 20250817.xlsx",
-         "Name", "E-mail",
-        ],
     ]
 else:
     INPUT_DATA = [
@@ -197,7 +192,7 @@ def read_all_user_data(sincere_all_users):
     return all_user_data
 
 
-def write_report(rpt_path, org_name, org_file, change_emails, duplicate_matchnames, merged_data, missing_names,
+def write_report(rpt_path, org_name, org_filename, change_emails, duplicate_matchnames, merged_data, missing_names,
                  all_haar):
     """ write all sheets into workbook for report dfs """
 
@@ -260,27 +255,27 @@ def write_report(rpt_path, org_name, org_file, change_emails, duplicate_matchnam
                  ['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year',
                      'addresses_count', 'new_email', ],
                  'multi',
-                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     write_banded(change_emails,
                  ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
                  'change emails',
-                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     write_banded(duplicate_matchnames,
                  ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
                  'dupes',
-                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     write_banded(merged_data,
                  ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
                  'all writers',
-                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     write_banded(missing_names,
                  ['new_email', ],
                  'missing_names',
-                 f"'{org_file}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     writer.close()
 
@@ -288,31 +283,41 @@ def write_report(rpt_path, org_name, org_file, change_emails, duplicate_matchnam
 def main(input_data):
     """ loop through list of info for each organizers files and supply matched writer report for each"""
 
-    sincere_requests = read_sincere_requests(SINCERE_REQUESTS)
+    # all users in system
     sincere_users = read_all_user_data(SINCERE_ALL_USERS)
 
-    # writers who have never requested addresses so do not appear in request file
+    # requests give address counts to see who has been active and in what room; users who never requested are missing
+    sincere_requests = read_sincere_requests(SINCERE_REQUESTS)
+
+    # identify writers who have never requested addresses to merge in later
     users_not_in_requests = left_not_in_right(sincere_users, sincere_requests, 'match_name')
 
-    # sincere_combined will have at least one record for each writer
+    # add writers with no requests to request info
     sincere_combined = pd.concat([sincere_requests, users_not_in_requests], ignore_index=True)
+    # only keep columns from request files along with 'is_active' (from user file)
     sincere_combined = sincere_combined[['is_active'] + sincere_requests.columns.tolist()]
 
     sincere_combined = sincere_combined.sort_values(['match_name', ])
 
-    # combine all record counts for each writer by year/room/email...
+    # summarize address counts by name/year/room/email to examine later by name
+    # this will be merged with individual bulk files supplied by orgs for comparison
     grouped_sincere_data = group_sincere_data(sincere_combined, ['match_name', 'name', 'existing_email', 'room',
                                                                  'year', 'is_active'])
 
-    for org_name, org_xls, org_name_field, org_email_field in input_data:
+    for org_name, org_xls, org_name_field, org_email_field in input_data:  # input_data is list of org's file and info
+
+        # read org's bulk input file supplying their fields used for name and email (different between orgs)
         org_data, missing_names = read_org_data(org_xls, org_name_field, org_email_field)
+
+        # get the org filename from the whole path to use as identifier in reports
         org_file = Path(org_xls).name
 
-        # merged_data will contain only writers from organizer's file matched by name with past address request
-        # counts or email/room for all matches
+        # matching and lookup must be attempted by name because writer can have different emails within or across rooms
+        # merged_data will contain only writers from org's file matched by name with past request counts or email/room
         merged_data = merge_org_and_sincere_data(org_data, grouped_sincere_data)
 
-        # only groups of records where f'Team {org_name}' is in one of the rooms
+        print(f"org name - ready to is_found_in_another: {org_name}")
+        # df with only groups of records where 'Team {org_name}' is in at least one room
         org_data = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}')
 
         duplicate_matchnames = merged_data[merged_data.match_name.duplicated(keep=False)]
@@ -323,11 +328,13 @@ def main(input_data):
 
         not_duplicate_matchnames = merged_data.drop_duplicates(subset='match_name', keep=False)
 
-        # emails that should be changed: only show in org's room, name matches, email does not
-        change_emails = not_duplicate_matchnames.loc[
-            (not_duplicate_matchnames['room'].str.contains('Team ' + org_name, case=False, na=False)) &
-            (not_duplicate_matchnames['email_matches'] == 'No')
-             ]
+        # emails that should be changed: only show in org's room with name matche but email does not
+        # change_emails = not_duplicate_matchnames.loc[
+        #     (not_duplicate_matchnames['room'].str.contains('Team ' + org_name, case=False, na=False)) &
+        #     (not_duplicate_matchnames['email_matches'] == 'No')
+        #      ]
+        change_emails = is_found_in_another(merged_data, 'room', group_column='room', filter_string=f'Team {org_name}',
+                                            solo=True)
 
         write_report(RPT_PATH, org_name, org_file, change_emails, duplicate_matchnames, merged_data, missing_names,
                      org_data)

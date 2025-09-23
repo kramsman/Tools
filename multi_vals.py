@@ -27,7 +27,7 @@ def is_found_in_another(df, occurance_col, group_column=None, filter_string=None
     """ returns records with col_name value found in other records
     """
 
-    if group_column is None:  # need to set up simple case with list normally created via groupby
+    if group_column is None:  # this is no group. need to set up simple case with list normally created via groupby
         group_column = occurance_col
 
     # Group by 'key_column' and aggregate 'value_column' into a list
