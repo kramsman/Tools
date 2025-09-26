@@ -25,11 +25,7 @@ def df_issubset(item, list_from_df_element):
 
 def is_found_in_another(df, occurance_col, group_column=None, filter_string=None, solo_occ=False):
     """ returns records with col_name value found in other records
-    :param single_row:
-    :type single_row:
     """
-
-    # FIXME: add ability to keep single rows - maybe desired for solo?
 
     if group_column is None:  # this is no group. need to set up simple case with list normally created via groupby
         group_column = occurance_col
@@ -62,7 +58,7 @@ def is_found_in_another(df, occurance_col, group_column=None, filter_string=None
     print("\nMerged dataFrame with aggregated lists merged and non-repeat removed:")
     print(df_merged)
 
-    # clean up temporary field
+    # delete temporary fields
     df_merged = df_merged.drop(['is_found_in_another', '_col_list', '_row_count'], axis=1)
 
     return df_merged

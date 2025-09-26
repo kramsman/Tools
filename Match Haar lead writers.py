@@ -19,7 +19,7 @@ SINCERE_REQUESTS = "/Users/Denise/Downloads/all-parent-campaigns-requests-2025-0
 # to 9/9/2025
 SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2025-09-10.csv"
 
-if True:
+if False:
     INPUT_DATA = [
         ["Larry",
          "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Larry writers for ROV ver 1.xlsx",
@@ -192,16 +192,14 @@ def read_all_user_data(sincere_all_users):
     return all_user_data
 
 
-def write_report(rpt_path, org_name, org_filename, change_emails, duplicate_matchnames, merged_data, missing_names,
-                 all_haar):
-    """ write all sheets into workbook for report dfs """
-
-    # FIXME: make file names named parameters
+def write_report(rpt_path, org_name, org_filename, *, change_emails, cross_rooms, missing_names, all_writers):
+    """ write all sheets into workbook for report dfs
+    """
 
     writer = pd.ExcelWriter(
         rpt_path / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx", engine='xlsxwriter')
 
-    def write_banded(df, field_list, sheetname, title1):
+    def write_banded(df, sheetname, field_list, title1):
         """ print sheet in specific format """
 
         def index_to_col(column_int):
@@ -253,30 +251,19 @@ def write_report(rpt_path, org_name, org_filename, change_emails, duplicate_matc
         worksheet.write(0, 0, title1)  #
         # title of bookname, row_num, col_num (0-indexed)
 
-    write_banded(all_haar,
-                 ['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year',
-                     'addresses_count', 'new_email', ],
-                 'multi',
-                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
-
-    write_banded(change_emails,
+    write_banded(change_emails, 'change emails',
                  ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
-                 'change emails',
                  f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
-    write_banded(duplicate_matchnames,
+    write_banded(cross_rooms, 'cross rooms',
                  ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
-                 'dupes',
                  f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
-    write_banded(merged_data,
-                 ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
-                 'all writers',
+    write_banded(missing_names, 'missing_names', ['new_email', ],
                  f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
-    write_banded(missing_names,
-                 ['new_email', ],
-                 'missing_names',
+    write_banded(all_writers, 'all writers in file',
+                 ['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year', 'addresses_count', 'new_email', ],
                  f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     writer.close()
@@ -313,31 +300,31 @@ def main(input_data):
 
         # read org's bulk input file supplying their fields used for name and email (different between orgs)
         # create an error file of missing writer names (Sincere will ignore and not load)
-        org_data, missing_names = read_org_data(org_xls, org_name_field, org_email_field)
+        all_writers, missing_names = read_org_data(org_xls, org_name_field, org_email_field)
 
         # matching and lookup must be done by name because writer can have different emails within or across rooms
         # merged_data will contain only writers from org's file matched by name with past request counts or email/room
-        merged_data = merge_org_and_sincere_data(org_data, grouped_sincere_data)
+        merged_data = merge_org_and_sincere_data(all_writers, grouped_sincere_data)
 
-        print(f"org name - ready to is_found_in_another: {org_name}")
+        ########
+        # ###### create report files
         # df with only groups of records where 'Team {org_name}' is in at least one room
-        org_data = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}',
+        # emails that should be changed: only show in org's room with name matching but different email
+        change_emails = is_found_in_another(merged_data, 'room', group_column='match_name',
+                                            filter_string=f'Team {org_name}', single_row_incl=True,
+                                            homogenous_group=True)
+        change_emails = change_emails[change_emails['email_matches'] == 'No']
+
+        all_writers = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}',
                                        homogenous_group=False)
 
-        duplicate_matchnames = merged_data[merged_data.match_name.duplicated(keep=False)]
-        # haar_dupes = duplicate_matchnames.loc[
-        #     (duplicate_matchnames['room'].str.contains('Haar', case=False, na=False)) &
-        #     (duplicate_matchnames['email_matches'] == 'No')
-        #      ]
+        cross_rooms = is_found_in_another(merged_data, 'room', group_column='match_name', filter_string=f'Team {org_name}',
+                                       homogenous_group=False)
 
-        not_duplicate_matchnames = merged_data.drop_duplicates(subset='match_name', keep=False)
+        # not_duplicate_matchnames = merged_data.drop_duplicates(subset='match_name', keep=False)
 
-        # emails that should be changed: only show in org's room with name matching but not email
-        change_emails = is_found_in_another(merged_data, 'room', group_column='match_name',
-                                            filter_string=f'Team {org_name}', single_row=True, homogenous_group=True)
-
-        write_report(RPT_PATH, org_name, org_file, change_emails, duplicate_matchnames, merged_data, missing_names,
-                     org_data)
+        write_report(RPT_PATH, org_name, org_file, change_emails=change_emails, cross_rooms=cross_rooms,
+                     missing_names=missing_names, all_writers=all_writers)
 
 
 if __name__ == '__main__':
