@@ -27,29 +27,31 @@ def is_found_in_another(df, occurance_col, group_column=None, filter_string=None
     """ returns records with col_name value found in other records
     """
 
-    if group_column is None:  # this is no group. need to set up simple case with list normally created via groupby
-        group_column = occurance_col
+    if Filter_out_haar:
+        df = df[df['room'] != "National-Bob Haar"]
+
+    if id_field is None:  # this is no group. need to set up simple case with list normally created via groupby
+        id_field = check_field
 
     # Group by 'key_column' and aggregate 'value_column' into a list
-    df_groupby = df.groupby(group_column) \
-        .agg(_col_list=(occurance_col, list),
-             _row_count=(occurance_col, 'count')
-             )\
-        .reset_index().query("_row_count > 1 ")
+    df_groupby = df.groupby(id_field) \
+        .agg(_col_list=(check_field, list),
+             _row_count=(check_field, 'count')
+             ).reset_index()
 
     df_groupby['_col_list_joined'] = df_groupby['_col_list'].apply(lambda x: '#'.join(x).lower())
 
     print("\nGroupby aggregated dataFrame with lists and single occurrences removed:")
     print(df_groupby)
 
-    df_merged = df.merge(df_groupby, on=group_column, how='left')
+    df_merged = df.merge(df_groupby, on=id_field, how='left')
 
     df_merged = df_merged[df_merged['_col_list_joined'].str.contains(filter_string.lower(), na=False)]
 
     # df_merged['is_subset'] = set(df_merged['room']).issubset(set(df_merged['_col_list']))  # does not work:TypeError: unhashable type: 'list'
 
     df_merged['is_found_in_another'] = df_merged. \
-        apply(lambda row: df_issubset(row[occurance_col], row['_col_list']), axis=1)
+        apply(lambda row: df_issubset(row[check_field], row['_col_list']), axis=1)
 
     print("\nMerged dataFrame with aggregated lists merged with repeats still in:")
     print(df_merged)
