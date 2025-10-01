@@ -12,6 +12,9 @@ import pymsgbox
 # from bekutils import setup_loguru, autosize_xls_cols, bad_path_create, exit_yes_no, exit_yes, \
 #     text_box, get_file_name, get_dir_name, check_ws_headers
 
+FILTER_ONE_NAME = True  # for testing
+NAME_TO_FILTER = 'Katherine Ross'  # converted to lower with spaces removed below
+
 DISPLAY_BLANK_NAME = False
 RPT_PATH = Path('rpts')
 
@@ -19,12 +22,17 @@ SINCERE_REQUESTS = "/Users/Denise/Downloads/all-parent-campaigns-requests-2025-0
 # to 9/9/2025
 SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2025-09-10.csv"
 
-if False:
+if True:
     INPUT_DATA = [
         ["Larry",
          "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Larry writers for ROV ver 1.xlsx",
          "Name", "email",
          ],
+        ["Jim",
+         "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Jim Sincere "
+         "Upload 20250817.xlsx",
+         "Name", "E-mail",
+         ]
     ]
 else:
     INPUT_DATA = [
@@ -81,7 +89,7 @@ def format_as_matchname(name):
     return matched_name
 
 
-def read_org_data(org_xls, org_name_field, org_email_field):
+def read_org_file(org_xls, org_name_field, org_email_field):
     """ read bulk input file supplied by organizer and rename given name and email fields to standard."""
 
     org_data = pd.read_excel(org_xls, dtype=str)
@@ -93,7 +101,8 @@ def read_org_data(org_xls, org_name_field, org_email_field):
     org_data = org_data.rename(columns={org_name_field: 'name', org_email_field: 'new_email'})
 
     org_data['match_name'] = org_data['name'].apply(format_as_matchname)
-    # org_data = org_data[org_data['match_name'] == 'katherineross']
+    if FILTER_ONE_NAME:
+        org_data = org_data[org_data['match_name'] == NAME_TO_FILTER]  # 'barbaralewis']
 
 
     missing_names = org_data[org_data['match_name'] == '']
@@ -117,7 +126,8 @@ def read_sincere_requests(sincere_requests):
         columns={'writer_name': 'name', 'writer_email': 'existing_email', 'org_name': 'room'})
 
     sincere_data['match_name'] = sincere_data['name'].apply(format_as_matchname)
-    # sincere_data = sincere_data[sincere_data['match_name'] == 'katherineross']
+    if FILTER_ONE_NAME:
+        sincere_data = sincere_data[sincere_data['match_name'] == NAME_TO_FILTER]
 
     missing_name = sincere_data[sincere_data['match_name'] == ''][['match_name', 'existing_email']]
     if not missing_name.empty and DISPLAY_BLANK_NAME:
@@ -144,13 +154,18 @@ def group_sincere_data(sincere_data, by_fields):
     return grouped_sincere_data
 
 
-def merge_org_and_sincere_data(*, org_data, grouped_sincere_data, filter_out_haar):  # FIX ME - losing grouped data
+def merge_org_and_sincere_groups(*, org_data, grouped_sincere_data):
+    # FIXME: losing grouped data
+    # All users 2025-9-10 shows:
+    # NC-Entire State
+    # National Bob Haar - Team Larry
+    # National-Bob Haar
+    # all writers in report shows only 2:
+    # National Bob Haar - Team Larry	2025	100	dwraynes@gmail.com
+    # NC-Entire State		0	dwraynes@gmail.com
+
     """ match the writers supplied by organizer by name to show if they are already in rooms and how many addresses
-    they've written by year
-    :param filter_out_haar:
-    :type filter_out_haar:
-    :param *:
-    :type *: """
+    they've written by year """
     merged_data = org_data.merge(grouped_sincere_data, how='left', left_on='match_name', right_on='match_name',
                                  sort=False, suffixes=('_org', '_sincere',), copy=None, indicator=False, validate=None)
 
@@ -162,7 +177,7 @@ def merge_org_and_sincere_data(*, org_data, grouped_sincere_data, filter_out_haa
     merged_data['new_email'] = merged_data['new_email'].str.lower()
     merged_data['existing_email'] = merged_data['existing_email'].str.lower()
 
-    # we know these are an existing writer because name and email match.
+    # we know this is an existing writer because old and new emails match for given name
     merged_data['email_matches'] = np.where(merged_data['new_email'] == merged_data['existing_email'], 'Yes', 'No')
     merged_data = merged_data.reset_index(drop=True)
     return merged_data
@@ -191,7 +206,8 @@ def read_all_user_data(sincere_all_users):
 
     all_user_data['match_name'] = all_user_data['name'].apply(format_as_matchname)
     all_user_data = all_user_data[all_user_data['is_active'] == True]
-    # all_user_data = all_user_data[all_user_data['match_name'] == 'katherineross']
+    if FILTER_ONE_NAME:
+        all_user_data = all_user_data[all_user_data['match_name'] == NAME_TO_FILTER]
 
     missing_name = all_user_data[all_user_data['match_name'] == ''][['match_name', 'existing_email']]
     if not missing_name.empty and DISPLAY_BLANK_NAME:
@@ -263,26 +279,29 @@ def write_report(rpt_path, org_name, org_filename, *, change_emails, cross_rooms
         })
         worksheet.autofit()
         worksheet.write(0, 0, title1)  #
-        # title of bookname, row_num, col_num (0-indexed)
+    if not change_emails.empty:
+        write_banded(change_emails, 'change emails',
+                     ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
+                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
-    write_banded(change_emails, 'change emails',
-                 ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
-                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+    if not cross_rooms.empty:
+        write_banded(cross_rooms, 'cross rooms',
+                     ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
+                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
-    write_banded(cross_rooms, 'cross rooms',
-                 ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
-                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+    if not overlap_w_haar.empty:
+        write_banded(overlap_w_haar, 'overlap_w_haar',
+                     ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
+                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
-    write_banded(overlap_w_haar, 'overlap_w_haar',
-                 ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
-                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+    if not missing_names.empty:
+        write_banded(missing_names, 'missing_names', ['new_email', ],
+                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
-    write_banded(missing_names, 'missing_names', ['new_email', ],
-                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
-
-    write_banded(all_writers, 'all writers in file',
-                 ['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year', 'addresses_count', 'new_email', ],
-                 f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+    if not all_writers.empty:
+        write_banded(all_writers, 'all writers in file',
+                     ['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year', 'addresses_count', 'new_email', ],
+                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     writer.close()
 
@@ -293,7 +312,7 @@ def main(input_data):
     # all users in system
     sincere_users = read_all_user_data(SINCERE_ALL_USERS)
 
-    # requests give address counts to see who has been active and in what room; users who never requested are missing
+    # address counts showing activity in which room; users who never requested are missing
     sincere_requests = read_sincere_requests(SINCERE_REQUESTS)
 
     # identify writers who have never requested addresses to merge in later
@@ -312,6 +331,8 @@ def main(input_data):
     grouped_sincere_data = group_sincere_data(sincere_combined, ['match_name', 'name', 'existing_email', 'room',
                                                                  'year', 'is_active'])
 
+    ####
+    #### process each organizer's file and report
     for org_name, org_xls, org_name_field, org_email_field in input_data:  # input_data is list of org's file and info
 
         # get the org filename from the whole path to use as identifier in reports
@@ -319,38 +340,42 @@ def main(input_data):
 
         # read org's bulk input file supplying their fields used for name and email (different between orgs)
         # create an error file of missing writer names (Sincere will ignore and not load)
-        all_writers, missing_names = read_org_data(org_xls, org_name_field, org_email_field)
+        all_writers, missing_names = read_org_file(org_xls, org_name_field, org_email_field)
 
         # matching and lookup must be done by name because writer can have different emails within or across rooms
         # merged_data will contain only writers from org's file matched by name with past request counts or email/room
-        merged_data = merge_org_and_sincere_data(org_data=all_writers, grouped_sincere_data=grouped_sincere_data,
-                                                 filter_out_haar=True)
+        merged_data = merge_org_and_sincere_groups(org_data=all_writers, grouped_sincere_data=grouped_sincere_data)
 
         merged_data = merged_data.sort_values(['match_name', ])
 
-        ########
-        # ###### create report files
+        ####### create report files
         # df with only groups of records where 'Team {org_name}' is in at least one room
         # emails that should be changed: only show in org's room with name matching but different email
-        change_emails = is_found_in_another(df=merged_data, check_field='room', id_field='match_name',
-                                            filter_string=f'Team {org_name}', checks_the_same=True,
-                                            single_row_incl=True, Filter_out_haar=True)
-        change_emails = change_emails[change_emails['email_matches'] == 'No']
+        change_emails = is_found_in_another(df_func=merged_data, check_field='room', id_field='match_name',
+                                            filter_string=f'Team {org_name}', one_room=True,
+                                            single_row_incl=True,
+                                            filter_out=['National-Bob Haar', 'ZZZZZZ National Bob Haar - Team Casey'])
+        if not change_emails.empty:
+            change_emails = change_emails[change_emails['email_matches'] == 'No']  # FIXME: should keep all
+            # email_matches if one does across rows
 
-        all_writers = is_found_in_another(df=merged_data, check_field='room', id_field='match_name',
-                                          filter_string=f'Team {org_name}', checks_the_same=False, Filter_out_haar=True)
+        all_writers = is_found_in_another(df_func=merged_data, check_field='room', id_field='match_name',
+                                          filter_string=f'Team {org_name}', one_room=False,
+                                          filter_out=[])
 
-        cross_rooms = is_found_in_another(df=merged_data, check_field='room', id_field='match_name',
-                                          filter_string=f'Team {org_name}', checks_the_same=False, Filter_out_haar=True)
+        cross_rooms = is_found_in_another(df_func=merged_data, check_field='room', id_field='match_name',
+                                          filter_string=f'Team {org_name}', one_room=False,
+                                          filter_out=['National-Bob Haar', 'ZZZZZZ National Bob Haar - Team Casey'])
 
-        overlap_w_haar = is_found_in_another(df=merged_data, check_field='room', id_field='match_name',
-                                          filter_string=f'Team {org_name}', checks_the_same=False,
-                                                 Filter_out_haar=False)
-        # not_duplicate_matchnames = merged_data.drop_duplicates(subset='match_name', keep=False)
+        overlap_w_haar = is_found_in_another(df_func=merged_data, check_field='room', id_field='match_name',
+                                             filter_string=f'Team {org_name}', one_room=False,
+                                             filter_out=[])
 
         write_report(RPT_PATH, org_name, org_file, change_emails=change_emails, cross_rooms=cross_rooms,
                      overlap_w_haar=overlap_w_haar, missing_names=missing_names, all_writers=all_writers)
 
 
 if __name__ == '__main__':
+    NAME_TO_FILTER = format_as_matchname(NAME_TO_FILTER)
+
     main(INPUT_DATA)
