@@ -12,15 +12,17 @@ import pymsgbox
 # from bekutils import setup_loguru, autosize_xls_cols, bad_path_create, exit_yes_no, exit_yes, \
 #     text_box, get_file_name, get_dir_name, check_ws_headers
 
-FILTER_ONE_NAME = True  # for testing
-NAME_TO_FILTER = 'Katherine Ross'  # converted to lower with spaces removed below
+FILTER_ONE_NAME = False  # only name below for testing
+NAME_TO_FILTER = 'Susan Bennett'  # format_as_matchname converts to lower with spaces removed below
 
-DISPLAY_BLANK_NAME = False
+DISPLAY_BLANK_NAME = False  # print missing names to console
 RPT_PATH = Path('rpts')
 
 SINCERE_REQUESTS = "/Users/Denise/Downloads/all-parent-campaigns-requests-2025-09-08.csv"  # requests from 1/1/2020
 # to 9/9/2025
 SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2025-09-10.csv"
+
+ROOMS_TO_FILTER_OUT = ['National-Bob Haar', 'ZZZZZZ National Bob Haar - Team Casey']  # list of names ignored in reports
 
 if True:
     INPUT_DATA = [
@@ -103,7 +105,6 @@ def read_org_file(org_xls, org_name_field, org_email_field):
     org_data['match_name'] = org_data['name'].apply(format_as_matchname)
     if FILTER_ONE_NAME:
         org_data = org_data[org_data['match_name'] == NAME_TO_FILTER]  # 'barbaralewis']
-
 
     missing_names = org_data[org_data['match_name'] == '']
     if not missing_names.empty and DISPLAY_BLANK_NAME:
@@ -188,13 +189,13 @@ def left_not_in_right(*, left, right, match_field_list):
     """
 
     # link to merging / "in one not in other" code: https://stackoverflow.com/questions/53645882/pandas-merging-101
-    merged = (left.merge(right, on=match_field_list, how='left', indicator=True, suffixes=('', '_right'))
+    left_not_in_right = (left.merge(right, on=match_field_list, how='left', indicator=True, suffixes=('', '_right'))
      .query('_merge == "left_only"')
      .drop('_merge', axis=1))
 
-    merged = merged[left.columns]
+    left_not_in_right = left_not_in_right[left.columns]
 
-    return merged
+    return left_not_in_right
 
 
 def read_all_user_data(sincere_all_users):
@@ -299,7 +300,7 @@ def write_report(rpt_path, org_name, org_filename, *, change_emails, cross_rooms
                      f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
     if not all_writers.empty:
-        write_banded(all_writers, 'all writers in file',
+        write_banded(all_writers, 'all occurances',
                      ['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year', 'addresses_count', 'new_email', ],
                      f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
 
@@ -317,7 +318,7 @@ def main(input_data):
 
     # identify writers who have never requested addresses to merge in later
     users_not_in_requests = left_not_in_right(left=sincere_users, right=sincere_requests,
-                                              match_field_list=['match_name', 'room'])
+                                              match_field_list=['match_name', 'room', 'existing_email'])
 
     # add writers with no requests to request info
     sincere_combined = pd.concat([sincere_requests, users_not_in_requests], ignore_index=True)
@@ -354,9 +355,9 @@ def main(input_data):
         change_emails = is_found_in_another(df_func=merged_data, check_field='room', id_field='match_name',
                                             filter_string=f'Team {org_name}', one_room=True,
                                             single_row_incl=True,
-                                            filter_out=['National-Bob Haar', 'ZZZZZZ National Bob Haar - Team Casey'])
+                                            filter_out=ROOMS_TO_FILTER_OUT)
         if not change_emails.empty:
-            change_emails = change_emails[change_emails['email_matches'] == 'No']  # FIXME: should keep all
+            change_emails = change_emails[(change_emails['email_matches'] == 'No') | (change_emails['_row_count'] > 1)]
             # email_matches if one does across rows
 
         all_writers = is_found_in_another(df_func=merged_data, check_field='room', id_field='match_name',
@@ -365,7 +366,7 @@ def main(input_data):
 
         cross_rooms = is_found_in_another(df_func=merged_data, check_field='room', id_field='match_name',
                                           filter_string=f'Team {org_name}', one_room=False,
-                                          filter_out=['National-Bob Haar', 'ZZZZZZ National Bob Haar - Team Casey'])
+                                          filter_out=ROOMS_TO_FILTER_OUT)
 
         overlap_w_haar = is_found_in_another(df_func=merged_data, check_field='room', id_field='match_name',
                                              filter_string=f'Team {org_name}', one_room=False,
