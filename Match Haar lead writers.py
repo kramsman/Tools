@@ -112,7 +112,7 @@ def read_org_file(org_xls, org_name_field, org_email_field):
         print(Path(org_xls).name)
         print(missing_names)
 
-    # FIXME: add reports showing duplicate emails and duplicate names in org file (ex mary jane file: nancy beaudet )
+    # duplicate emails ex: mary jane file: nancy beaudet
     duplicate_names = org_data[org_data.duplicated('match_name', keep=False) == True]
     duplicate_names = duplicate_names[~(duplicate_names['match_name'] == '')]
     duplicate_names = duplicate_names.sort_values(['match_name', ])
@@ -243,7 +243,6 @@ def write_report(rpt_path, org_name, org_filename, *, change_emails, cross_rooms
 
     """
 
-    # FIXME: add reports showing duplicate emails and duplicate names in org file (ex mary jane file: nancy beaudet )
     # FIXME: why does cathy moratto show on change email list when email is the the same?  Capital name?  Why
     #  Elizabeth Hulton?
     # FIXME: Esther mac in Gary
