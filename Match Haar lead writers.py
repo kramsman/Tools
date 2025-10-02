@@ -112,9 +112,29 @@ def read_org_file(org_xls, org_name_field, org_email_field):
         print(Path(org_xls).name)
         print(missing_names)
 
+    # FIXME: add reports showing duplicate emails and duplicate names in org file (ex mary jane file: nancy beaudet )
+    duplicate_names = org_data[org_data.duplicated('match_name', keep=False) == True]
+    duplicate_names = duplicate_names[~(duplicate_names['match_name'] == '')]
+    duplicate_names = duplicate_names.sort_values(['match_name', ])
+
+    # duplicatetempfilt1 = org_data.duplicated(subset=['match_name'], keep=False)
+    # duplicatetempfilt1a = (org_data['match_name'] != '')
+
+
+    # duplicatetemp2 = org_data[org_data.duplicated('new_email', keep=False) == True]
+    # duplicatetemp2 = duplicatetemp2[~(duplicatetemp2['new_email'] == '')]
+    # duplicate_emails = org_data.duplicated(subset=['new_email'], keep=False)
+    duplicate_emails = org_data[org_data.duplicated('new_email', keep=False) == True]
+    duplicate_emails = duplicate_emails.sort_values(['new_email', ])
+
+    # all_duplicatesfilt = (duplicatetempfilt1 & duplicatetempfilt1a) | duplicatetempfilt2
+    # duplicates = org_data[all_duplicatesfilt]
+
+    # duplicates = duplicates.sort_values(['match_name', ])
+
     org_data = org_data[org_data['match_name'] != '']
 
-    return org_data, missing_names
+    return org_data, missing_names, duplicate_names, duplicate_emails
 
 
 def read_sincere_requests(sincere_requests):
@@ -218,13 +238,12 @@ def read_all_user_data(sincere_all_users):
 
 
 def write_report(rpt_path, org_name, org_filename, *, change_emails, cross_rooms, overlap_w_haar, missing_names,
-                 all_writers):
+                 all_writers, duplicate_names, duplicate_emails):
     """ write all sheets into workbook for report dfs
+
     """
 
-    # FIXME: add report of multiple emails & multiple names in org file (mary jane  file / nancy beaudet - (like
-    #  missing name code)
-    # FIXME: sort by name_org, email_matches, new_email, existing_email
+    # FIXME: add reports showing duplicate emails and duplicate names in org file (ex mary jane file: nancy beaudet )
     # FIXME: why does cathy moratto show on change email list when email is the the same?  Capital name?  Why
     #  Elizabeth Hulton?
     # FIXME: Esther mac in Gary
@@ -300,6 +319,18 @@ def write_report(rpt_path, org_name, org_filename, *, change_emails, cross_rooms
                      title1=f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'",
                      hidesheet=False)
 
+    if not duplicate_names.empty:
+        write_banded(df=duplicate_names, sheetname='duplicate_names',
+                     field_list=['name', 'new_email', ],
+                     title1=f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'",
+                     hidesheet=False)
+
+    if not duplicate_emails.empty:
+        write_banded(df=duplicate_emails, sheetname='duplicate_emails',
+                     field_list=['name', 'new_email', ],
+                     title1=f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'",
+                     hidesheet=False)
+
     if not overlap_w_haar.empty:
         write_banded(df=overlap_w_haar, sheetname='overlap_w_haar',
                      field_list=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year',
@@ -356,7 +387,8 @@ def main(input_data):
 
         # read org's bulk input file supplying their fields used for name and email (different between orgs)
         # create an error file of missing writer names (Sincere will ignore and not load)
-        all_writers, missing_names = read_org_file(org_xls, org_name_field, org_email_field)
+        all_writers, missing_names, duplicate_names, duplicate_emails = read_org_file(org_xls, org_name_field,
+                                                                                org_email_field)
 
         # matching and lookup must be done by name because writer can have different emails within or across rooms
         # merged_data will contain only writers from org's file matched by name with past request counts or email/room
@@ -390,7 +422,8 @@ def main(input_data):
                                              filter_out=[])
 
         write_report(RPT_PATH, org_name, org_file, change_emails=change_emails, cross_rooms=cross_rooms,
-                     overlap_w_haar=overlap_w_haar, missing_names=missing_names, all_writers=all_writers)
+                     overlap_w_haar=overlap_w_haar, missing_names=missing_names, all_writers=all_writers,
+                     duplicate_names=duplicate_names, duplicate_emails=duplicate_emails)
 
 
 if __name__ == '__main__':
