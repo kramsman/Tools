@@ -24,7 +24,7 @@ SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2025-09-10.csv"
 
 ROOMS_TO_FILTER_OUT = ['National-Bob Haar', 'ZZZZZZ National Bob Haar - Team Casey']  # list of names ignored in reports
 
-if True:
+if False:
     INPUT_DATA = [
         ["Larry",
          "/Users/Denise/Library/CloudStorage/Dropbox/Postcard Files/Other/WriterLists/Haar leads 7-2025/Haar Larry writers for ROV ver 1.xlsx",
@@ -80,8 +80,6 @@ SINCERE_ALL_USERS_DATE = '-'.join(SINCERE_ALL_USERS.stem.split('-')[-3:])
 # noinspection SpellCheckingInspection
 def format_as_matchname(name):
     """ format name in most standard fashion so match can be preformed """
-
-    # TODO: use optional first name last name instead of combined
 
     try:
         # exception added for a name read as a float/nan
@@ -156,7 +154,7 @@ def group_sincere_data(sincere_data, by_fields):
 
 
 def merge_org_and_sincere_groups(*, org_data, grouped_sincere_data):
-    # FIXME: losing grouped data
+    # FIXED: losing grouped data
     # All users 2025-9-10 shows:
     # NC-Entire State
     # National Bob Haar - Team Larry
@@ -170,10 +168,7 @@ def merge_org_and_sincere_groups(*, org_data, grouped_sincere_data):
     merged_data = org_data.merge(grouped_sincere_data, how='left', left_on='match_name', right_on='match_name',
                                  sort=False, suffixes=('_org', '_sincere',), copy=None, indicator=False, validate=None)
 
-    merged_data = merged_data[~merged_data['room'].isna()]  # TODO: is this needed??
-
-    # if filter_out_haar:
-    #     merged_data = merged_data[merged_data['room'] != "National-Bob Haar"]
+    merged_data = merged_data[~merged_data['room'].isna()]
 
     merged_data['new_email'] = merged_data['new_email'].str.lower()
     merged_data['existing_email'] = merged_data['existing_email'].str.lower()
@@ -227,11 +222,19 @@ def write_report(rpt_path, org_name, org_filename, *, change_emails, cross_rooms
     """ write all sheets into workbook for report dfs
     """
 
+    # FIXME: add report of multiple emails & multiple names in org file (mary jane  file / nancy beaudet - (like
+    #  missing name code)
+    # FIXME: sort by name_org, email_matches, new_email, existing_email
+    # FIXME: why does cathy moratto show on change email list when email is the the same?  Capital name?  Why
+    #  Elizabeth Hulton?
+    # FIXME: Esther mac in Gary
+
     writer = pd.ExcelWriter(
         rpt_path / f"{org_name} batch load writer match with {SINCERE_ALL_USERS_DATE} user data.xlsx", engine='xlsxwriter')
 
-    def write_banded(df, sheetname, field_list, title1):
-        """ print sheet in specific format """
+    def write_banded(*, df, sheetname, field_list, title1, hidesheet=False):
+        """ print sheet in specific format
+        """
 
         def index_to_col(column_int):
             """ converts an excel column number to corresponding letter """
@@ -279,30 +282,42 @@ def write_report(rpt_path, org_name, org_filename, *, change_emails, cross_rooms
             'format': red_format
         })
         worksheet.autofit()
-        worksheet.write(0, 0, title1)  #
+        worksheet.write(0, 0, title1)
+        if hidesheet:
+            worksheet.hide()
+
     if not change_emails.empty:
-        write_banded(change_emails, 'change emails',
-                     ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
-                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+        write_banded(df=change_emails, sheetname='change emails',
+                     field_list=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year',
+                                 'addresses_count'],
+                     title1=f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'",
+                     hidesheet=False)
 
     if not cross_rooms.empty:
-        write_banded(cross_rooms, 'cross rooms',
-                     ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
-                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+        write_banded(df=cross_rooms, sheetname='cross rooms',
+                     field_list=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year',
+                                 'addresses_count'],
+                     title1=f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'",
+                     hidesheet=False)
 
     if not overlap_w_haar.empty:
-        write_banded(overlap_w_haar, 'overlap_w_haar',
-                     ['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year', 'addresses_count'],
-                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+        write_banded(df=overlap_w_haar, sheetname='overlap_w_haar',
+                     field_list=['name_org', 'email_matches', 'new_email', 'existing_email', 'room', 'year',
+                                 'addresses_count'],
+                     title1=f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'",
+                     hidesheet=True)
 
     if not missing_names.empty:
-        write_banded(missing_names, 'missing_names', ['new_email', ],
-                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+        write_banded(df=missing_names, sheetname='missing_names', field_list=['new_email', ],
+                     title1=f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'",
+                     hidesheet=False)
 
     if not all_writers.empty:
-        write_banded(all_writers, 'all occurances',
-                     ['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year', 'addresses_count', 'new_email', ],
-                     f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'")
+        write_banded(df=all_writers, sheetname='all occurances',
+                     field_list=['name_org', 'is_active', 'email_matches', 'existing_email', 'room', 'year',
+                                 'addresses_count', 'new_email', ],
+                     title1=f"'{org_filename}' batch load writer match with '{SINCERE_ALL_USERS_DATE} user data.xlsx'",
+                     hidesheet=True)
 
     writer.close()
 
