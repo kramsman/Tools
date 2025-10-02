@@ -362,7 +362,9 @@ def main(input_data):
         # merged_data will contain only writers from org's file matched by name with past request counts or email/room
         merged_data = merge_org_and_sincere_groups(org_data=all_writers, grouped_sincere_data=grouped_sincere_data)
 
-        merged_data = merged_data.sort_values(['match_name', ])
+        # sort so email matching is in an expected order in rows
+        merged_data = merged_data.sort_values(['match_name', 'name_org', 'email_matches', 'new_email',
+                                               'existing_email', ])
 
         ####### create report files
         # df with only groups of records where 'Team {org_name}' is in at least one room
