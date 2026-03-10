@@ -41,14 +41,16 @@ def standard_format(string):
         # exception added for a name read as a float/nan
         formatted_str = string.replace(' ', '').lower()
     except:
-        formatted_str = string(string)
+        formatted_str = str(string)
     return formatted_str
 
 
 def is_found_in_another(*, df_func, check_field, id_field=None, filter_string=None, one_room=False,
-                        single_row_incl=False, filter_out=[]):
+                        single_row_incl=False, filter_out=None):
     """ returns records with col_name value found in other records
     """
+    if filter_out is None:
+        filter_out = []
 
     # filter_out = ['National-Bob Haar', 'National Bob Haar - Team Bob', 'ZZZZZZ National Bob Haar - Team Casey']
 
@@ -68,8 +70,8 @@ def is_found_in_another(*, df_func, check_field, id_field=None, filter_string=No
     df_merged = df_func.merge(df_groupby, on=id_field, how='left')
 
     df_merged['_set'] = df_merged['_col_list'].apply(lambda l: set(l),)
-    df_merged['num_of_rooms'] = df_merged['_col_list'].apply(lambda l: len(set(l)),)  # TODO: is this the same as
-    # row_count?
+    df_merged['num_of_rooms'] = df_merged['_col_list'].apply(lambda l: len(set(l)),)  # unique room count; differs
+    # from _row_count which is total appearances (same room counted multiple times)
 
     if not single_row_incl:
         # keep single rows (having filter string). these have group_column in _col_list, which is always true,

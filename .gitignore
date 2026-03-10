@@ -181,3 +181,4 @@ cython_debug/
 /rpts/.idea/.gitignore
 /ai for df multi rooms.py
 /ai for in multi rooms.py
+!/rpts/

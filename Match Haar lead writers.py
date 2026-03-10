@@ -7,7 +7,6 @@ from multi_vals import is_found_in_another
 from pathlib import Path
 import pandas as pd
 import numpy as np
-# from datetime import datetime
 import pymsgbox
 # from bekutils import setup_loguru, autosize_xls_cols, bad_path_create, exit_yes_no, exit_yes, \
 #     text_box, get_file_name, get_dir_name, check_ws_headers
@@ -20,7 +19,7 @@ RPT_PATH = Path('rpts')
 
 SINCERE_REQUESTS = "/Users/Denise/Downloads/all-parent-campaigns-requests-2025-09-08.csv"  # requests from 1/1/2020
 # to 9/9/2025
-SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2025-09-10.csv"
+SINCERE_ALL_USERS = "/Users/Denise/Downloads/all-users-2026-03-09.csv"
 
 ROOMS_TO_FILTER_OUT = ['National-Bob Haar', 'ZZZZZZ National Bob Haar - Team Casey']  # list of names ignored in reports
 
@@ -199,18 +198,28 @@ def merge_org_and_sincere_groups(*, org_data, grouped_sincere_data):
     return merged_data
 
 
-def left_not_in_right(*, left, right, match_field_list):
-    """ match two dataframes by a common column and return those in left not appearing in right
-    """
+def load_combined_sincere_data():
+    """ load all-users and request history from Sincere; combine so every active user appears even if
+    they have never requested addresses, then summarize address counts by name/year/room/email """
 
-    # link to merging / "in one not in other" code: https://stackoverflow.com/questions/53645882/pandas-merging-101
-    left_not_in_right = (left.merge(right, on=match_field_list, how='left', indicator=True, suffixes=('', '_right'))
-     .query('_merge == "left_only"')
-     .drop('_merge', axis=1))
+    sincere_users = read_all_user_data(SINCERE_ALL_USERS)
+    sincere_requests = read_sincere_requests(SINCERE_REQUESTS)
 
-    left_not_in_right = left_not_in_right[left.columns]
+    # find users who have never requested addresses (not in requests file) and add them in
+    users_not_in_requests = (
+        sincere_users
+        .merge(sincere_requests, on=['match_name', 'room', 'existing_email'], how='left', indicator=True,
+               suffixes=('', '_right'))
+        .query('_merge == "left_only"')
+        .drop('_merge', axis=1)
+        [sincere_users.columns]
+    )
 
-    return left_not_in_right
+    sincere_combined = pd.concat([sincere_requests, users_not_in_requests], ignore_index=True)
+    sincere_combined = sincere_combined[['is_active'] + sincere_requests.columns.tolist()]
+    sincere_combined = sincere_combined.sort_values(['match_name'])
+
+    return group_sincere_data(sincere_combined, ['match_name', 'name', 'existing_email', 'room', 'year', 'is_active'])
 
 
 def read_all_user_data(sincere_all_users):
@@ -355,27 +364,8 @@ def write_report(rpt_path, org_name, org_filename, *, change_emails, cross_rooms
 def main(input_data):
     """ loop through list of info for each organizers files and supply matched writer report for each"""
 
-    # all users in system
-    sincere_users = read_all_user_data(SINCERE_ALL_USERS)
-
-    # address counts showing activity in which room; users who never requested are missing
-    sincere_requests = read_sincere_requests(SINCERE_REQUESTS)
-
-    # identify writers who have never requested addresses to merge in later
-    users_not_in_requests = left_not_in_right(left=sincere_users, right=sincere_requests,
-                                              match_field_list=['match_name', 'room', 'existing_email'])
-
-    # add writers with no requests to request info
-    sincere_combined = pd.concat([sincere_requests, users_not_in_requests], ignore_index=True)
-    # only keep columns from request files along with 'is_active' (from user file)
-    sincere_combined = sincere_combined[['is_active'] + sincere_requests.columns.tolist()]
-
-    sincere_combined = sincere_combined.sort_values(['match_name', ])
-
-    # summarize address counts by name/year/room/email to examine later by name
-    # this will be merged with individual bulk files supplied by orgs for comparison
-    grouped_sincere_data = group_sincere_data(sincere_combined, ['match_name', 'name', 'existing_email', 'room',
-                                                                 'year', 'is_active'])
+    # all users combined with request history; users with no requests are included with zero activity
+    grouped_sincere_data = load_combined_sincere_data()
 
     ####
     #### process each organizer's file and report
@@ -416,9 +406,7 @@ def main(input_data):
                                           filter_string=f'Team {org_name}', one_room=False,
                                           filter_out=ROOMS_TO_FILTER_OUT)
 
-        overlap_w_haar = is_found_in_another(df_func=merged_data, check_field='room', id_field='match_name',
-                                             filter_string=f'Team {org_name}', one_room=False,
-                                             filter_out=[])
+        overlap_w_haar = all_writers
 
         write_report(RPT_PATH, org_name, org_file, change_emails=change_emails, cross_rooms=cross_rooms,
                      overlap_w_haar=overlap_w_haar, missing_names=missing_names, all_writers=all_writers,

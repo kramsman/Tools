@@ -1,0 +1,12 @@
+[project]
+name = "tools"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "uvbekutils",
+    "xlsxwriter>=3.2.9",
+]
+
+[tool.uv.sources]
+uvbekutils = { git = "https://github.com/kramsman/uvbekutils.git" }
