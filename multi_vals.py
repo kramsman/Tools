@@ -14,7 +14,7 @@ def df_issubset(item, list_from_df_element):
         item_as_list = item
 
     if not isinstance(list_from_df_element, list):
-    # if not isinstance(normal_list, list):
+        # if not isinstance(normal_list, list):
         is_subset = False
     else:
         is_subset = set(item_as_list).issubset(list_from_df_element)
@@ -23,7 +23,30 @@ def df_issubset(item, list_from_df_element):
     return is_subset
 
 
-def is_found_in_another(df, occurance_col, group_column=None, filter_string=None, solo_occ=False):
+def df_partial_in_list(filter_string, df_list):
+    """ like isin or issubset but for s substring contained in df mylist elements """
+
+    # mylist = df_groupby['_col_list'].apply(lambda x: '#'.join(x).lower())
+    mylist = '#'.join(df_list).lower()
+
+    in_list = filter_string.lower() in mylist
+
+    return in_list
+
+
+def standard_format(string):
+    """ format string in most standard fashion so match can be preformed """
+
+    try:
+        # exception added for a name read as a float/nan
+        formatted_str = string.replace(' ', '').lower()
+    except:
+        formatted_str = string(string)
+    return formatted_str
+
+
+def is_found_in_another(*, df_func, check_field, id_field=None, filter_string=None, one_room=False,
+                        single_row_incl=False, filter_out=[]):
     """ returns records with col_name value found in other records
     """
 
@@ -41,11 +64,6 @@ def is_found_in_another(df, occurance_col, group_column=None, filter_string=None
         .agg(_col_list=(check_field, list),
              _row_count=(check_field, 'count')
              ).reset_index()
-
-    df_groupby['_col_list_joined'] = df_groupby['_col_list'].apply(lambda x: '#'.join(x).lower())
-
-    print("\nGroupby aggregated dataFrame with lists and single occurrences removed:")
-    print(df_groupby)
 
     df_merged = df_func.merge(df_groupby, on=id_field, how='left')
 
@@ -77,10 +95,6 @@ def is_found_in_another(df, occurance_col, group_column=None, filter_string=None
     # only the group we want
     df_merged = df_merged[df_merged['string_in_list']]
 
-    df_merged = df_merged.loc[df_merged['is_found_in_another'] == True]
-    print("\nMerged dataFrame with aggregated lists merged and non-repeat removed:")
-    print(df_merged)
-
     # delete temporary fields
     # df_merged = df_merged.drop(['is_found_in_another', '_col_list', '_row_count'], axis=1)
 
@@ -90,17 +104,24 @@ def is_found_in_another(df, occurance_col, group_column=None, filter_string=None
 def main():
     """ test out is_found_in_another function"""
 
-    is_found = is_found_in_another(df, 'room', 'writer', 'HaaR')
+    is_found = is_found_in_another(df_func=df, check_field='room', id_field='writer', filter_string='NY',
+                                   one_room=True, filter_out=[])
 
     print("\nDataFrame: is_found_in_another")
     print(is_found)
 
 
 if __name__ == '__main__':
+    # data = {
+    #         'writer': ['jim', 'jim', 'kate', 'jim'],
+    #         'room': ['NY', 'Haar', 'NY', 'NY'],
+    #         'value_column': [10, 20, 30, 40],
+    #         }
+
     data = {
-            'writer': ['jim', 'jim', 'kate', ],
-            'room': ['NY', 'Haar', 'NY', ],
-            'value_column': [10, 20, 30, ],
+            'writer': ['jim', 'jim', 'kate', 'kate'],
+            'room': ['NY', 'NY', 'CA', 'CA'],
+            'value_column': [10, 20, 30, 40],
             }
 
     df = pd.DataFrame(data)
