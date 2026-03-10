@@ -1,0 +1,94 @@
+import pandas as pd
+
+
+def reverse_string(text):
+    """
+    Function that accepts a string and returns it reversed
+    
+    Args:
+        text (str): The input string to reverse
+        
+    Returns:
+        str: The reversed string
+    """
+    return text[::-1]
+
+
+def add_reversed_column(df, field_name):
+    """
+    Function that adds a new column with reversed values from the specified field
+    
+    Args:
+        df (pandas.DataFrame): The DataFrame to modify
+        field_name (str): The name of the field to reverse
+        
+    Returns:
+        pandas.DataFrame: Modified DataFrame with the new reversed column
+    """
+    if field_name not in df.columns:
+        print(f"Error: Field '{field_name}' does not exist in the DataFrame")
+        return df
+
+    # Create new column name
+    new_column_name = f"{field_name}_reversed"
+
+    # Add new column with reversed values
+    df[new_column_name] = df[field_name].apply(reverse_string)
+
+    return df
+
+
+# Create the data with repeated names for multiple cars and matching pets
+data = {
+    'name': [
+        'John', 'John',  # John owns two cars
+        'Emma',  # Emma owns one car
+        'Michael', 'Michael', 'Michael',  # Michael owns three cars
+        'Sarah',  # Sarah owns one car
+        'David', 'David',  # David owns two cars
+        'Lisa',  # Lisa owns one car
+        'James',  # James owns one car
+        'Anna',  # Anna owns one car
+        'Peter', 'Peter',  # Peter owns two cars
+        'Sophie'  # Sophie owns one car
+    ],
+    'car': [
+        'Toyota', 'BMW',  # John's cars
+        'Honda',  # Emma's car
+        'Toyota', 'Tesla', 'Audi',  # Michael's cars
+        'BMW',  # Sarah's car
+        'Honda', 'Mercedes',  # David's cars
+        'Mercedes',  # Lisa's car
+        'BMW',  # James's car
+        'Audi',  # Anna's car
+        'Tesla', 'Toyota',  # Peter's cars
+        'Mercedes'  # Sophie's car
+    ],
+    'pet': [
+        'Dog', 'Dog',  # John has a dog
+        'Cat',  # Emma has a cat
+        'Fish', 'Fish', 'Fish',  # Michael has a fish
+        'Bird',  # Sarah has a bird
+        'Cat', 'Cat',  # David has a cat
+        'Hamster',  # Lisa has a hamster
+        'Dog',  # James has a dog
+        'Cat',  # Anna has a cat
+        'Bird', 'Bird',  # Peter has a bird
+        'Rabbit'  # Sophie has a rabbit
+    ]
+}
+
+# Create the DataFrame
+df = pd.DataFrame(data)
+
+# Sort the DataFrame by name
+df = df.sort_values(by='name')
+
+# Reset the index after sorting
+df = df.reset_index(drop=True)
+
+# Add reversed name column
+df = add_reversed_column(df, 'name')
+
+# Print the DataFrame
+print(df)

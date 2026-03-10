@@ -40,6 +40,31 @@ def load_writers(csv_path: str | Path) -> pd.DataFrame:
     return df[~mask]
 
 
+def load_requests(csv_path: str | Path) -> tuple[pd.DataFrame, str]:
+    """Read requests CSV and return last request date and total addresses by email and organization.
+
+    Args:
+        csv_path (str | Path): Path to the Sincere all-parent-campaigns-requests CSV.
+
+    Returns:
+        tuple[pd.DataFrame, str]: One row per (email, organization) with columns last_request
+            and total_addresses summarized from all requests, plus a date-range string
+            formatted as 'MM/DD/YYYY through MM/DD/YYYY'.
+    """
+
+    df = pd.read_csv(csv_path, na_filter=False)
+    df = df.rename(columns={'writer_email': 'email', 'org_name': 'organization'})
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    date_range = (f"{df['created_at'].min().strftime('%m/%d/%Y')} through "
+                  f"{df['created_at'].max().strftime('%m/%d/%Y')}")
+    grouped = df.groupby(['email', 'organization']).agg(
+        last_request=('created_at', 'max'),
+        total_addresses=('addresses_count', 'sum')
+    ).reset_index()
+    grouped['last_request'] = grouped['last_request'].dt.date
+    return grouped, date_range
+
+
 def find_multi_org_writers(df: pd.DataFrame) -> pd.DataFrame:
     """Return one row per writer+org for writers appearing in more than one organization.
 
@@ -57,7 +82,8 @@ def find_multi_org_writers(df: pd.DataFrame) -> pd.DataFrame:
     return result.sort_values(['email', 'name', 'organization']).reset_index(drop=True)
 
 
-def write_report(df: pd.DataFrame, csv_path: str | Path, total_writers: int) -> None:
+def write_report(df: pd.DataFrame, csv_path: str | Path, total_writers: int,
+                 request_date_range: str) -> None:
     """Write multi-org writers report to Excel with alternating row bands grouped by email.
 
     Output file is written to RPT_PATH with a filename derived from the date
@@ -70,6 +96,8 @@ def write_report(df: pd.DataFrame, csv_path: str | Path, total_writers: int) -> 
             filename date suffix and the report title.
         total_writers (int): Total number of unique active writers after org filtering,
             shown as a summary count above the data.
+        request_date_range (str): Date range string from the requests file, e.g.
+            '01/01/2020 through 09/08/2025', shown in the report header.
     """
 
     date_str = '-'.join(Path(csv_path).stem.split('-')[-3:])
@@ -77,11 +105,11 @@ def write_report(df: pd.DataFrame, csv_path: str | Path, total_writers: int) -> 
     multi_org_count = df['email'].nunique()
 
     with pd.ExcelWriter(out_path, engine='xlsxwriter') as writer:
-        header_row = 6  # zero-indexed; row 0 = title, 1 = blank, 2-3 = counts, 4 = filter, 5 = blank, 6 = header
+        header_row = 7  # zero-indexed; row 0 = title, 1 = blank, 2-3 = counts, 4-5 = filter+dates, 6 = blank, 7 = header
         # email in col B so banding formula (which compares col B) groups by email
         df.to_excel(writer, index=False, sheet_name='multiple orgs',
                     startrow=header_row, startcol=1,
-                    columns=['email', 'name', 'organization'])
+                    columns=['email', 'name', 'organization', 'last_request', 'total_addresses'])
 
         workbook = writer.book
         worksheet = writer.sheets['multiple orgs']
@@ -97,6 +125,8 @@ def write_report(df: pd.DataFrame, csv_path: str | Path, total_writers: int) -> 
         worksheet.write(3, 2, multi_org_count)
         worksheet.write(4, 1, 'Excluded organizations containing:')
         worksheet.write(4, 2, ', '.join(EXCLUDE_ORG_SUBSTRINGS))
+        worksheet.write(5, 1, 'Address counts from:')
+        worksheet.write(5, 2, request_date_range)
 
         worksheet.set_column('A:A', None, None, {'hidden': True})
 
@@ -109,7 +139,7 @@ def write_report(df: pd.DataFrame, csv_path: str | Path, total_writers: int) -> 
 
         red_fmt = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
         worksheet.conditional_format(
-            f'$B${header_row + 1}:$D${len(df) + header_row + 1}',
+            f'$B${header_row + 1}:$F${len(df) + header_row + 1}',
             {'type': 'formula', 'criteria': f'=$A{header_row + 1}=1', 'format': red_fmt})
 
         worksheet.autofit()
@@ -119,22 +149,32 @@ def write_report(df: pd.DataFrame, csv_path: str | Path, total_writers: int) -> 
 
 
 def main() -> None:
-    """Select input file, find writers in multiple orgs, and write report.
+    """Select input files, find writers in multiple orgs, merge request history, and write report.
 
-    Prompts the user to select a Sincere all-users CSV via a file dialog,
-    filters to active writers in multiple organizations, and writes an Excel
-    report to the rpts/ directory.
+    Prompts the user to select a Sincere all-users CSV and a requests CSV via file dialogs,
+    filters to active writers in multiple organizations, merges last request date and total
+    addresses per writer+org, and writes an Excel report to the rpts/ directory.
     """
-    csv_path = select_file(
+    users_path = select_file(
         title='Select Sincere all-users CSV',
         start_dir=str(DOWNLOADS),
         files_like='all-user*.csv')
 
-    if csv_path is None:
-        print('No file selected.')
+    if users_path is None:
+        print('No users file selected.')
         return
 
-    df = load_writers(csv_path)
+    requests_path = select_file(
+        title='Select Sincere requests CSV',
+        title2='File should contain all requests from 1/1/2020 to present',
+        start_dir=str(DOWNLOADS),
+        files_like='all-parent-campaigns-requests*.csv')
+
+    if requests_path is None:
+        print('No requests file selected.')
+        return
+
+    df = load_writers(users_path)
     total_writers = df['email'].nunique()
     multi_org = find_multi_org_writers(df)
 
@@ -142,7 +182,10 @@ def main() -> None:
         print('No writers found in multiple organizations.')
         return
 
-    write_report(multi_org, csv_path, total_writers)
+    requests, date_range = load_requests(requests_path)
+    multi_org = multi_org.merge(requests, on=['email', 'organization'], how='left')
+
+    write_report(multi_org, users_path, total_writers, date_range)
 
 
 if __name__ == '__main__':
