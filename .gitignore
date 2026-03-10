@@ -181,5 +181,5 @@ cython_debug/
 /rpts/.idea/.gitignore
 /Work/ai for df multi rooms.py
 /Work/ai for in multi rooms.py
-!/rpts/
+/rpts/
 !/Work/
