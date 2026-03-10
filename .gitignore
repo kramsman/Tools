@@ -161,3 +161,23 @@ cython_debug/
 #.idea/
 !/.rpts/*
 !/.gitignore
+/rpts/Bob batch load writer match with 2025-09-10 user data.xlsx
+/car_and_pet_ownership_data_analysis.py
+/car_owner_pet_score_analysis.py
+/car_ownership_and_pet_data_analysis.py
+/car_pet_ownership_analysis.py
+/car_pet_ownership_analysis2.py
+/CarOwnershipAnalysis.py
+/data_frame_car_pet_analysis.py
+/rpts/.idea/misc.xml
+/rpts/.idea/modules.xml
+/passaic_county_zip_codes.csv
+/rpts/.idea/inspectionProfiles/profiles_settings.xml
+/rpts/.idea/inspectionProfiles/Project_Default.xml
+/rpts/.idea/rpts.iml
+/car_and_pet_ownership_analysis.py
+/string_manipulation_and_data_frame_utils.py
+/rpts/.idea/vcs.xml
+/rpts/.idea/.gitignore
+/ai for df multi rooms.py
+/ai for in multi rooms.py
